@@ -1,0 +1,4 @@
+[
+	{ "keys": ["ctrl+alt+space"], "command": "convert_to_utf8" }
+]
+ 

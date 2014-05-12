@@ -1,0 +1,3 @@
+[
+	{ "keys": ["super+ctrl+space"], "command": "cwk_auto_complete" }
+]
