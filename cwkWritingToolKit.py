@@ -1,6 +1,8 @@
 import sublime, sublime_plugin
+import os, codecs
 
 VERSION = "0.01"
+WORDFILEPATH = os.path.join("Dictionaries", "dictionary.cwktxt")
 
 class CwkInsertSelectedText(sublime_plugin.TextCommand):
 
@@ -13,10 +15,11 @@ class CwkAutoComplete(sublime_plugin.WindowCommand):
 
 		self.plugin_settings = sublime.load_settings("cwkWritingToolKit.sublime-settings")
 		super().__init__(window)
-		self._words = ["foo", "bar"]
+		self.debug = self.plugin_settings.get("debug", False)
+		self._words = self.getWords(WORDFILEPATH)
 
 	def run(self):
-		self.debug = self.plugin_settings.get("debug", False)
+
 		window = sublime.active_window()
 		view = window.active_view()
 		self.log("view id: ", view.view_id)
@@ -29,10 +32,19 @@ class CwkAutoComplete(sublime_plugin.WindowCommand):
 		self.log("Word selected: " , selected_string)
 		window = sublime.active_window()
 		view = window.active_view()
-		view.run_command("cwk_insert_selected_text", {"args": {'text': selected_string} })
+		view.run_command("cwk_insert_selected_text", {"args": {'text': selected_string.strip()} })
+
+	def getWords(self, filename):
+		word_lines = []
+		if os.path.isfile(filename): 
+			f = codecs.open(filename, "r", "utf-8")
+			word_lines = f.readlines()
+			self.log("cwk Dictionary Num Words Found: ", len(word_lines))
+		else:
+			self.log("cwk Dictionary file not found: ", filename)
+		return word_lines
 
 	def log(self, *message):
 		if(self.debug):
 			print (*message)
-
 
