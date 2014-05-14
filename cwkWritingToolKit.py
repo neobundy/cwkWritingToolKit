@@ -56,7 +56,7 @@ class cwkUtil:
 		else: 
 			return False
 	def isEnglish(self, word):
-		if re.match(r'(^[a-bA-B]+)', word): 
+		if re.match(r'(^[a-zA-Z]+)', word): 
 			return True
 		else: 
 			return False
