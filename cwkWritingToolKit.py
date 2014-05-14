@@ -184,6 +184,7 @@ class CwkFetchWebDic(sublime_plugin.TextCommand, cwkUtil):
 	def __init__(self, *args, **kwargs):
 		sublime_plugin.TextCommand.__init__(self, *args, **kwargs)
 		cwkUtil.__init__(self)
+
 	def run(self, edit):
 
 		# get active window and view
@@ -200,6 +201,8 @@ class CwkFetchWebDic(sublime_plugin.TextCommand, cwkUtil):
 			self.log("Word selected: ", self.currentWord)
 
 			if self.isEnglish(self.currentWord):
+				self._words = []
+		
 				options = WEB_ENGLISH_DIC_OPTIONS.format(query=self.currentWord)
 				request = urllib.request.Request(WEB_ENGLISH_DIC_URL % options)
 
@@ -214,6 +217,7 @@ class CwkFetchWebDic(sublime_plugin.TextCommand, cwkUtil):
 				self._words = parser.getWords()
 
 			elif self.isKorean(self.currentWord):
+				self._words = []
 				self.fetchSynonyms(self.currentWord)
 
 
