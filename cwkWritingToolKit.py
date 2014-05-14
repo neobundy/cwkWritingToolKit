@@ -21,6 +21,7 @@ ENGLISH_TARGET_BLOCK_TAG = 'span'
 ENGLISH_TARGET_SYNONYM_TAG = 'a'
 ENGLISH_TARGET_SYNONYM_LABEL = '[유의어]' 
 
+MAX_QUERY_DEPTH = 10
 KOREAN_TARGET_SYNONYM_TAG = 'a' 
 KOREAN_TARGET_SYNONYM_CLASS_ID = 'syno'
 
@@ -190,6 +191,7 @@ class CwkFetchWebDic(sublime_plugin.TextCommand, cwkUtil):
 		window = sublime.active_window()
 		view = window.active_view()
 
+		self._query_depth = 0
 		# save the word at the cursor position
 
 		self.currentWord = view.substr(view.word(view.sel()[0].begin()))
@@ -208,26 +210,40 @@ class CwkFetchWebDic(sublime_plugin.TextCommand, cwkUtil):
 
 				parser = cwkEnglishWebDicParser()
 
+				parser.feed(webpage)
+				self._words = parser.getWords()
+
 			elif self.isKorean(self.currentWord):
-				encoded_query = urllib.parse.quote(self.currentWord)
-				self.log("Encoded Korean: ", encoded_query)
-				options = WEB_KOREAN_DIC_OPTIONS.format(query=encoded_query)
-				request = urllib.request.Request(WEB_KOREAN_DIC_URL % options)
+				self.fetchSynonyms(self.currentWord)
 
-				self.log("Web Dic URL: " , WEB_KOREAN_DIC_URL % options)
-
-				response = urllib.request.urlopen(request)
-				webpage = response.read().decode('utf-8')
-
-				parser = cwkKoreanWebDicParser()
-
-
-			parser.feed(webpage)
-
-			self._words = parser.getWords()
 
 			self.log("Num synonyms found: ", len(self._words))
 			view.show_popup_menu(self._words, self.on_done)
+
+	def fetchSynonyms(self, word):
+
+		self._query_depth +=1
+
+		if self._query_depth > MAX_QUERY_DEPTH: return 
+
+		encoded_query = urllib.parse.quote(word)
+		self.log("Encoded Korean: ", encoded_query)
+		options = WEB_KOREAN_DIC_OPTIONS.format(query=encoded_query)
+		request = urllib.request.Request(WEB_KOREAN_DIC_URL % options)
+
+		self.log("Web Dic URL: " , WEB_KOREAN_DIC_URL % options)
+
+		response = urllib.request.urlopen(request)
+		webpage = response.read().decode('utf-8')
+
+		parser = cwkKoreanWebDicParser()
+
+		parser.feed(webpage)
+		for s in parser.getWords():
+			if s not in self._words:
+				self._words.append(s)
+				self.fetchSynonyms(s)
+
 
 	def on_done(self, index):
 	#show_popup_menu callback method 
