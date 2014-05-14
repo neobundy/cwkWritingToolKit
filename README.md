@@ -20,6 +20,8 @@ Wankyu Choi <wankyuchoi@gmail.com>
 - Add user setting: custom dictionary path
 - Add feature: auto-completion by parsing specified document files (default autocompletion add-on feature)  
 - Add feature: thread support
+- Add feature: Korean Dic
+- Add feature: Japanese Dic
 
 # Contact
 
