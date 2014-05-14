@@ -1,13 +1,84 @@
 import sublime, sublime_plugin
 import os, codecs
+import urllib
+from html.parser import HTMLParser
+
 
 VERSION = "0.01"
+WEB_DIC_URL = "http://endic.naver.com/search.nhn?%s"
+
+WEB_DIC_OPTIONS = {'query' : 'test',
+          			'searchOption' : 'thesaurus',}
+
+TARGET_BLOCK_TAG = 'span'
+TARGET_KEYWORD = '[유의어]' 
+TARGET_SYNONYM_TAG = 'a'
 
 # Python idiom: os-independent file path 
 
 package_path = os.path.join(sublime.packages_path(), "cwkWritingToolKit")
-WORDFILEPATH = os.path.join("Dictionaries", "dictionary.cwktxt")
-WORDFILEPATH  = os.path.join(package_path, WORDFILEPATH)
+WORD_FILE_PATH = os.path.join("Dictionaries", "dictionary.cwktxt")
+WORD_FILE_PATH  = os.path.join(package_path, WORD_FILE_PATH)
+
+
+class WebDicParser(HTMLParser):
+	def __init__(self):
+		super().__init__(self)
+		self._is_in_block = False
+		self._target_block_tag_found = False
+		self._target_synonym_tag_found = False
+		self._target_defs_tag_found = False
+		self._is_final_tag = False
+
+	def handle_starttag(self, tag, attrs):
+		if tag == TARGET_BLOCK_TAG:
+			if self._is_in_block and self._is_final_tag:
+				self.reset_tags()
+				self._target_defs_tag_found = True
+			else:
+				self._target_block_tag_found = True
+
+
+		elif tag == TARGET_SYNONYM_TAG and self._is_in_block:
+			# synonym tag found
+			self._target_synonym_tag_found = True
+		else:
+			self.reset_tags()
+
+	def handle_endtag(self, tag):
+		pass
+		
+	def handle_data(self, data):
+		if not self._is_in_block and self._target_block_tag_found and data.strip() == TARGET_KEYWORD:
+			self._is_in_block = True
+			print("Keyword:", data)
+		elif self._is_in_block and self._target_synonym_tag_found:
+			print ("Synonym:" , data)
+			self._target_synonym_tag_found = False
+			self._is_final_tag = True
+		elif self._target_defs_tag_found:
+			print ("Defs:", data)
+			self.reset_tags()
+		else:
+			self.reset_tags()
+
+
+	def reset_tags(self):
+		self._is_in_block = False
+		self._target_block_tag_found = False
+		self._target_synonym_tag_found = False
+		self._target_defs_tag_found = False
+		self._is_final_tag = False
+
+class CwkFetchWebDic(sublime_plugin.TextCommand):
+	def run(self, edit):
+		options = urllib.parse.urlencode(WEB_DIC_OPTIONS)
+		request = urllib.request.Request(WEB_DIC_URL % options)
+		response = urllib.request.urlopen(request)
+		webpage = response.read().decode('utf-8')
+
+		parser = WebDicParser()
+		parser.feed(webpage)
 
 # cwk_insert_selected_text command inserts text at cursor position
 # camel casing: CwkInsertSelectedText
@@ -54,7 +125,7 @@ class CwkAutoComplete(sublime_plugin.WindowCommand):
 
 		# self._words stores all found words whereas self._normalizedWords stores unique values.
 
-		self._words = self.getWords(WORDFILEPATH)
+		self._words = self.getWords(WORD_FILE_PATH)
 		self._normalizedWords = []
 		
 	def run(self): 

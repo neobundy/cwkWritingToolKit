@@ -1,3 +1,5 @@
 [
-	{ "keys": ["super+ctrl+space"], "command": "cwk_auto_complete" }
+	{ "keys": ["super+ctrl+space"], "command": "cwk_auto_complete" },
+	{ "keys": ["super+ctrl+option+space"], "command": "cwk_fetch_web_dic"},
 ]
+	
