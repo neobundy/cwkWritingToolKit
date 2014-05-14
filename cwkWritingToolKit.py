@@ -1,6 +1,5 @@
 import sublime, sublime_plugin
-import os, codecs
-import urllib
+import os, codecs, urllib, re
 from html.parser import HTMLParser
 
 VERSION = "0.02"
@@ -10,7 +9,7 @@ WEB_ENGLISH_DIC_URL = "http://endic.naver.com/search.nhn?%s"
 WEB_ENGLISH_DIC_OPTIONS = "query={query}&searchOption=thesaurus"
 
 # Korean Dictionary: Naver
-WEB_KOREAN_DIC_URL = "http://krdic.naver.com/search.nhn?%s"
+WEB_KOREAN_DIC_URL = "http://krdic.naver.com/search.nhn?kind=keyword&%s"
 WEB_KOREAN_DIC_OPTIONS = "query={query}"
 
 # Japanese Dictionary: Naver
@@ -18,9 +17,16 @@ WEB_JAPANESE_DIC_URL = "http://jpdic.naver.com/search.nhn?%s"
 WEB_JAPANESE_DIC_OPTIONS = "q={query}"
 
 
-TARGET_BLOCK_TAG = 'span'
-TARGET_KEYWORD = '[유의어]' 
-TARGET_SYNONYM_TAG = 'a'
+ENGLISH_TARGET_BLOCK_TAG = 'span'
+ENGLISH_TARGET_SYNONYM_TAG = 'a'
+ENGLISH_TARGET_SYNONYM_LABEL = '[유의어]' 
+
+KOREAN_TARGET_SYNONYM_TAG = 'a' 
+KOREAN_TARGET_SYNONYM_CLASS_ID = 'syno'
+
+JAPANESE_TARGET_BLOCK_TAG = 'span'
+JAPANESE_TARGET_KEYWORD = '[유의어]' 
+JAPANESE_TARGET_SYNONYM_TAG = 'a'
 
 # Python idiom: os-independent file path 
 
@@ -32,6 +38,7 @@ class cwkUtil:
 	def __init__(self):
 		self.plugin_settings = sublime.load_settings("cwkWritingToolKit.sublime-settings")
 		self.debug = self.plugin_settings.get("debug", False)
+		self._words = []
 
 	def log(self, *message):
 	# utility method to print out debug messages
@@ -42,35 +49,54 @@ class cwkUtil:
 
 		if(self.debug):
 			print (*message)
+	def isKorean(self, word):
+		if re.match(r'(^[가-힣]+)', word): 
+			return True
+		else: 
+			return False
+	def isEnglish(self, word):
+		if re.match(r'(^[a-bA-B]+)', word): 
+			return True
+		else: 
+			return False
+	def removeTags(self, line):
+		pattern = re.compile(r'<[^>]+>')
+		return pattern.sub('', line)
 
-
-class WebDicParser(HTMLParser, cwkUtil):
+class cwkWebDicParser(HTMLParser, cwkUtil):
 	def __init__(self):
 		HTMLParser.__init__(self)
 		cwkUtil.__init__(self)
+
+	def getWords(self):
+		return self._words
+
+
+class cwkEnglishWebDicParser(cwkWebDicParser):
+	def __init__(self):
+		cwkWebDicParser.__init__(self)
 		self._is_in_block = False
-		self._target_block_tag_found = False
-		self._target_synonym_tag_found = False
+		self._ENGLISH_TARGET_BLOCK_TAG_found = False
+		self._ENGLISH_TARGET_SYNONYM_TAG_found = False
 		self._target_defs_tag_found = False
 		self._is_final_tag = False
 		self.synonym = ''
 
-		self._words = []
 
 	def handle_starttag(self, tag, attrs):
-		if tag == TARGET_BLOCK_TAG:
+		if tag == ENGLISH_TARGET_BLOCK_TAG:
 			# target tag found
 
 			if self._is_in_block and self._is_final_tag:
 				self.reset_tags()
 				self._target_defs_tag_found = True
 			else:
-				self._target_block_tag_found = True
+				self._ENGLISH_TARGET_BLOCK_TAG_found = True
 
-		elif tag == TARGET_SYNONYM_TAG and self._is_in_block:
+		elif tag == ENGLISH_TARGET_SYNONYM_TAG and self._is_in_block:
 			# synonym tag found
 
-			self._target_synonym_tag_found = True
+			self._ENGLISH_TARGET_SYNONYM_TAG_found = True
 		else:
 			# false alarm
 
@@ -80,16 +106,16 @@ class WebDicParser(HTMLParser, cwkUtil):
 		pass
 		
 	def handle_data(self, data):
-		if not self._is_in_block and self._target_block_tag_found and data.strip() == TARGET_KEYWORD:
+		if not self._is_in_block and self._ENGLISH_TARGET_BLOCK_TAG_found and data.strip() == ENGLISH_TARGET_SYNONYM_LABEL:
 			#keyword found: block starts.
 
 			self._is_in_block = True
 			self.log("Keyword:", data)
-		elif self._is_in_block and self._target_synonym_tag_found:
+		elif self._is_in_block and self._ENGLISH_TARGET_SYNONYM_TAG_found:
 			#synonym tag found: gather synonym
 
 			self.synonym = data
-			self._target_synonym_tag_found = False
+			self._ENGLISH_TARGET_SYNONYM_TAG_found = False
 			self._is_final_tag = True
 		elif self._target_defs_tag_found:
 			# synonym definitions found: gather defs
@@ -112,13 +138,39 @@ class WebDicParser(HTMLParser, cwkUtil):
 
 	def reset_tags(self):
 		self._is_in_block = False
-		self._target_block_tag_found = False
-		self._target_synonym_tag_found = False
+		self._ENGLISH_TARGET_BLOCK_TAG_found = False
+		self._ENGLISH_TARGET_SYNONYM_TAG_found = False
 		self._target_defs_tag_found = False
 		self._is_final_tag = False
 
-	def getWords(self):
-		return self._words
+class cwkKoreanWebDicParser(cwkWebDicParser):
+	def __init__(self):
+		cwkWebDicParser.__init__(self)
+		self._target_synonym_found = False
+
+	def handle_starttag(self, tag, attrs):
+		if tag == KOREAN_TARGET_SYNONYM_TAG:
+			for name, value in attrs:
+				if name == 'class' and value == KOREAN_TARGET_SYNONYM_CLASS_ID:
+					self._target_synonym_found = True
+		else:
+			# false alarm
+			self.reset_tags()
+
+	def handle_endtag(self, tag):
+		pass
+		
+	def handle_data(self, data):
+		
+		data = self.removeTags(data)
+		if self._target_synonym_found:
+			self.log("synonym:", data)
+			if self.isKorean(data):
+				self._words.append(data)
+
+
+	def reset_tags(self):
+		self._target_synonym_found = False
 
 # cwk_fetch_WEB_ENGLISH_DIC text command inserts one of the synonym definitions fetched from the given web dictionary.
 # camel casing: CwkFetchWebDic
@@ -144,15 +196,32 @@ class CwkFetchWebDic(sublime_plugin.TextCommand, cwkUtil):
 
 		if self.currentWord:
 			self.log("Word selected: ", self.currentWord)
-			options = WEB_ENGLISH_DIC_OPTIONS.format(query=self.currentWord)
-			request = urllib.request.Request(WEB_ENGLISH_DIC_URL % options)
 
-			self.log("Web Dic URL: " , WEB_ENGLISH_DIC_URL % options)
+			if self.isEnglish(self.currentWord):
+				options = WEB_ENGLISH_DIC_OPTIONS.format(query=self.currentWord)
+				request = urllib.request.Request(WEB_ENGLISH_DIC_URL % options)
 
-			response = urllib.request.urlopen(request)
-			webpage = response.read().decode('utf-8')
+				self.log("Web Dic URL: " , WEB_ENGLISH_DIC_URL % options)
 
-			parser = WebDicParser()
+				response = urllib.request.urlopen(request)
+				webpage = response.read().decode('utf-8')
+
+				parser = cwkEnglishWebDicParser()
+
+			elif self.isKorean(self.currentWord):
+				encoded_query = urllib.parse.quote(self.currentWord)
+				self.log("Encoded Korean: ", encoded_query)
+				options = WEB_KOREAN_DIC_OPTIONS.format(query=encoded_query)
+				request = urllib.request.Request(WEB_KOREAN_DIC_URL % options)
+
+				self.log("Web Dic URL: " , WEB_KOREAN_DIC_URL % options)
+
+				response = urllib.request.urlopen(request)
+				webpage = response.read().decode('utf-8')
+
+				parser = cwkKoreanWebDicParser()
+
+
 			parser.feed(webpage)
 
 			self._words = parser.getWords()
