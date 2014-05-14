@@ -3,10 +3,20 @@ import os, codecs
 import urllib
 from html.parser import HTMLParser
 
-VERSION = "0.01"
-WEB_DIC_URL = "http://endic.naver.com/search.nhn?%s"
+VERSION = "0.02"
 
-WEB_DIC_OPTIONS = "query={query}&searchOption=thesaurus"
+# English Dictionary: Naver
+WEB_ENGLISH_DIC_URL = "http://endic.naver.com/search.nhn?%s"
+WEB_ENGLISH_DIC_OPTIONS = "query={query}&searchOption=thesaurus"
+
+# Korean Dictionary: Naver
+WEB_KOREAN_DIC_URL = "http://krdic.naver.com/search.nhn?%s"
+WEB_KOREAN_DIC_OPTIONS = "query={query}"
+
+# Japanese Dictionary: Naver
+WEB_JAPANESE_DIC_URL = "http://jpdic.naver.com/search.nhn?%s"
+WEB_JAPANESE_DIC_OPTIONS = "q={query}"
+
 
 TARGET_BLOCK_TAG = 'span'
 TARGET_KEYWORD = '[유의어]' 
@@ -110,12 +120,12 @@ class WebDicParser(HTMLParser, cwkUtil):
 	def getWords(self):
 		return self._words
 
-# cwk_fetch_web_dic text command inserts one of the synonym definitions fetched from the given web dictionary.
+# cwk_fetch_WEB_ENGLISH_DIC text command inserts one of the synonym definitions fetched from the given web dictionary.
 # camel casing: CwkFetchWebDic
-# snake casing: cwk_fetch_web_dic 
+# snake casing: cwk_fetch_WEB_ENGLISH_DIC 
 # Sublime Text translates camel cased commands into snake cased ones.
 # You can run snake cased command by calling the view's run_command() method as the following:
-# 	view.run_command("cwk_fetch_web_dic", text_to_insert)
+# 	view.run_command("cwk_fetch_WEB_ENGLISH_DIC", text_to_insert)
 
 class CwkFetchWebDic(sublime_plugin.TextCommand, cwkUtil):
 	def __init__(self, *args, **kwargs):
@@ -134,10 +144,10 @@ class CwkFetchWebDic(sublime_plugin.TextCommand, cwkUtil):
 
 		if self.currentWord:
 			self.log("Word selected: ", self.currentWord)
-			options = WEB_DIC_OPTIONS.format(query=self.currentWord)
-			request = urllib.request.Request(WEB_DIC_URL % options)
+			options = WEB_ENGLISH_DIC_OPTIONS.format(query=self.currentWord)
+			request = urllib.request.Request(WEB_ENGLISH_DIC_URL % options)
 
-			self.log("Web Dic URL: " , WEB_DIC_URL % options)
+			self.log("Web Dic URL: " , WEB_ENGLISH_DIC_URL % options)
 
 			response = urllib.request.urlopen(request)
 			webpage = response.read().decode('utf-8')
