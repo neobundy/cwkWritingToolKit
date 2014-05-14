@@ -3,12 +3,10 @@ import os, codecs
 import urllib
 from html.parser import HTMLParser
 
-
 VERSION = "0.01"
 WEB_DIC_URL = "http://endic.naver.com/search.nhn?%s"
 
-WEB_DIC_OPTIONS = {'query' : 'test',
-          			'searchOption' : 'thesaurus',}
+WEB_DIC_OPTIONS = "query={query}&searchOption=thesaurus"
 
 TARGET_BLOCK_TAG = 'span'
 TARGET_KEYWORD = '[유의어]' 
@@ -20,29 +18,52 @@ package_path = os.path.join(sublime.packages_path(), "cwkWritingToolKit")
 WORD_FILE_PATH = os.path.join("Dictionaries", "dictionary.cwktxt")
 WORD_FILE_PATH  = os.path.join(package_path, WORD_FILE_PATH)
 
-
-class WebDicParser(HTMLParser):
+class cwkUtil:
 	def __init__(self):
-		super().__init__(self)
+		self.plugin_settings = sublime.load_settings("cwkWritingToolKit.sublime-settings")
+		self.debug = self.plugin_settings.get("debug", False)
+
+	def log(self, *message):
+	# utility method to print out debug messages
+
+		# note that print is not a statement anymore in Python 3. It's a function.
+		# print "blah blah" will give you an error
+		# use print("blah blah") instead
+
+		if(self.debug):
+			print (*message)
+
+
+class WebDicParser(HTMLParser, cwkUtil):
+	def __init__(self):
+		HTMLParser.__init__(self)
+		cwkUtil.__init__(self)
 		self._is_in_block = False
 		self._target_block_tag_found = False
 		self._target_synonym_tag_found = False
 		self._target_defs_tag_found = False
 		self._is_final_tag = False
+		self.synonym = ''
+
+		self._words = []
 
 	def handle_starttag(self, tag, attrs):
 		if tag == TARGET_BLOCK_TAG:
+			# target tag found
+
 			if self._is_in_block and self._is_final_tag:
 				self.reset_tags()
 				self._target_defs_tag_found = True
 			else:
 				self._target_block_tag_found = True
 
-
 		elif tag == TARGET_SYNONYM_TAG and self._is_in_block:
 			# synonym tag found
+
 			self._target_synonym_tag_found = True
 		else:
+			# false alarm
+
 			self.reset_tags()
 
 	def handle_endtag(self, tag):
@@ -50,16 +71,32 @@ class WebDicParser(HTMLParser):
 		
 	def handle_data(self, data):
 		if not self._is_in_block and self._target_block_tag_found and data.strip() == TARGET_KEYWORD:
+			#keyword found: block starts.
+
 			self._is_in_block = True
-			print("Keyword:", data)
+			self.log("Keyword:", data)
 		elif self._is_in_block and self._target_synonym_tag_found:
-			print ("Synonym:" , data)
+			#synonym tag found: gather synonym
+
+			self.synonym = data
 			self._target_synonym_tag_found = False
 			self._is_final_tag = True
 		elif self._target_defs_tag_found:
-			print ("Defs:", data)
+			# synonym definitions found: gather defs
+
+			self.log("Synonym:" , self.synonym)
+			self.log("Defs:", data)
+			defs = data.split(",")
+			self._words.append(self.synonym)
+			self.log("Appending synonym: ", self.synonym)
+			for d in defs:
+				self._words.append("\t {0}".format(d))
+				self.log("Appending def: ",  d)
+			self.synonym = ''
 			self.reset_tags()
 		else:
+			# reset and get ready to go again
+
 			self.reset_tags()
 
 
@@ -70,15 +107,63 @@ class WebDicParser(HTMLParser):
 		self._target_defs_tag_found = False
 		self._is_final_tag = False
 
-class CwkFetchWebDic(sublime_plugin.TextCommand):
-	def run(self, edit):
-		options = urllib.parse.urlencode(WEB_DIC_OPTIONS)
-		request = urllib.request.Request(WEB_DIC_URL % options)
-		response = urllib.request.urlopen(request)
-		webpage = response.read().decode('utf-8')
+	def getWords(self):
+		return self._words
 
-		parser = WebDicParser()
-		parser.feed(webpage)
+# cwk_fetch_web_dic text command inserts one of the synonym definitions fetched from the given web dictionary.
+# camel casing: CwkFetchWebDic
+# snake casing: cwk_fetch_web_dic 
+# Sublime Text translates camel cased commands into snake cased ones.
+# You can run snake cased command by calling the view's run_command() method as the following:
+# 	view.run_command("cwk_fetch_web_dic", text_to_insert)
+
+class CwkFetchWebDic(sublime_plugin.TextCommand, cwkUtil):
+	def __init__(self, *args, **kwargs):
+		sublime_plugin.TextCommand.__init__(self, *args, **kwargs)
+		cwkUtil.__init__(self)
+	def run(self, edit):
+
+		# get active window and view
+
+		window = sublime.active_window()
+		view = window.active_view()
+
+		# save the word at the cursor position
+
+		self.currentWord = view.substr(view.word(view.sel()[0].begin()))
+
+		if self.currentWord:
+			self.log("Word selected: ", self.currentWord)
+			options = WEB_DIC_OPTIONS.format(query=self.currentWord)
+			request = urllib.request.Request(WEB_DIC_URL % options)
+
+			self.log("Web Dic URL: " , WEB_DIC_URL % options)
+
+			response = urllib.request.urlopen(request)
+			webpage = response.read().decode('utf-8')
+
+			parser = WebDicParser()
+			parser.feed(webpage)
+
+			self._words = parser.getWords()
+
+			self.log("Num synonyms found: ", len(self._words))
+			view.show_popup_menu(self._words, self.on_done)
+
+	def on_done(self, index):
+	#show_popup_menu callback method 
+	
+		# if the use canceled out of the popout menu, -1 is returned. Otherwise the index is returned.
+
+		if index == -1: return
+
+		selected_string = self._words[index]
+		window = sublime.active_window()
+		view = window.active_view()
+
+		# run Text Command cwk_insert_selected_text to replace the current word with the user's choice
+
+		view.run_command("cwk_insert_selected_text", {"args": {'text': selected_string.strip()} })
 
 # cwk_insert_selected_text command inserts text at cursor position
 # camel casing: CwkInsertSelectedText
@@ -87,7 +172,7 @@ class CwkFetchWebDic(sublime_plugin.TextCommand):
 # You can run snake cased command by calling the view's run_command() method as the following:
 # 	view.run_command("cwk_insert_selected_text", text_to_insert)
 
-class CwkInsertSelectedText(sublime_plugin.TextCommand):
+class CwkInsertSelectedText(sublime_plugin.TextCommand, cwkUtil):
 	def run(self, edit, args):
 		
 		# get current cursor position
@@ -102,17 +187,13 @@ class CwkInsertSelectedText(sublime_plugin.TextCommand):
 
 		self.view.replace(edit, word_region, args['text'])
  
-class CwkAutoComplete(sublime_plugin.WindowCommand):
+class CwkAutoComplete(sublime_plugin.WindowCommand, cwkUtil):
 	def __init__(self, window):
 
 		# super() refers to the immediate ancestor: sublime_plugin.WindowCommand in this case.
 
 		super().__init__(window)
-
-		# Sublime Text idiom: read settings
-
-		self.plugin_settings = sublime.load_settings("cwkWritingToolKit.sublime-settings")
-		self.debug = self.plugin_settings.get("debug", False)
+		cwkUtil.__init__(self)
 
 		# get active window and view
 
@@ -186,13 +267,4 @@ class CwkAutoComplete(sublime_plugin.WindowCommand):
 
 		self._normalizedWords = [ w.strip() for w in self._words if self.currentWord in w ]
 		
-	def log(self, *message):
-	# utility method to print out debug messages
-
-		# note that print is not a statement anymore in Python 3. It's a function.
-		# print "blah blah" will give you an error
-		# use print("blah blah") instead
-
-		if(self.debug):
-			print (*message)
 
