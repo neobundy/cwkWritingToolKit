@@ -9,7 +9,7 @@ WEB_ENGLISH_DIC_URL = "http://endic.naver.com/search.nhn?%s"
 WEB_ENGLISH_DIC_OPTIONS = "query={query}&searchOption=thesaurus"
 
 # Korean Dictionary: Naver
-WEB_KOREAN_DIC_URL = "http://krdic.naver.com/search.nhn?kind=keyword&%s"
+WEB_KOREAN_DIC_URL = "http://krdic.naver.com/search.nhn?kind=all&%s"
 WEB_KOREAN_DIC_OPTIONS = "query={query}"
 
 # Japanese Dictionary: Naver
@@ -153,15 +153,34 @@ class cwkKoreanWebDicParser(cwkWebDicParser):
 	def __init__(self):
 		cwkWebDicParser.__init__(self)
 		self._target_synonym_found = False
+		self._target_keyword_tag_found = False
+		self._is_in_block = False
 
 	def handle_starttag(self, tag, attrs):
-		if tag == KOREAN_TARGET_SYNONYM_TAG:
+		if tag == 'span':
 			for name, value in attrs:
-				if name == 'class' and value == KOREAN_TARGET_SYNONYM_CLASS_ID:
-					self._target_synonym_found = True
-		else:
-			# false alarm
-			self.reset_tags()
+				if name == 'class' and value == 'head_word':
+					self.log("in block")
+					self._is_in_block = True
+		if tag == 'div':
+			for name, value in attrs:
+				if name == 'class' and value == 'btn_showmore':
+					self.log("out of block")
+					self._is_in_block = False
+					self.reset_tags()
+
+
+		if self._is_in_block:
+			if tag == KOREAN_TARGET_SYNONYM_TAG:
+				for name, value in attrs:
+					if name == 'class' and value == KOREAN_TARGET_SYNONYM_CLASS_ID:
+						self._target_synonym_found = True
+			elif tag == 'strong':
+				self.log("keyword tag found")
+				self._target_keyword_tag_found = True
+			else:
+				# false alarm
+				self.reset_tags()
 
 	def handle_endtag(self, tag):
 		pass
@@ -172,11 +191,15 @@ class cwkKoreanWebDicParser(cwkWebDicParser):
 		if self._target_synonym_found:
 			self.log("synonym:", data)
 			if self.isKorean(data):
-				self._words.append(data)
-
+				self._words.append("\t" + data)
+		if self._target_keyword_tag_found:
+			self.log("Keyword: ", data)
+			self._words.append(data)
+			self._target_keyword_tag_found = False
 
 	def reset_tags(self):
 		self._target_synonym_found = False
+		self._target_keyword_tag_found = False
 
 # cwk_fetch_WEB_ENGLISH_DIC text command inserts one of the synonym definitions fetched from the given web dictionary.
 # camel casing: CwkFetchWebDic
@@ -234,7 +257,10 @@ class CwkFetchWebDic(sublime_plugin.TextCommand, cwkUtil):
 
 		self._query_depth +=1
 
-		if self._query_depth > MAX_QUERY_DEPTH: return 
+		if self._query_depth > MAX_QUERY_DEPTH: 
+			self.log("Max query depth reached: ", self._query_depth)
+			return 
+
 
 		encoded_query = urllib.parse.quote(word)
 		self.log("Encoded Korean: ", encoded_query)
@@ -252,6 +278,10 @@ class CwkFetchWebDic(sublime_plugin.TextCommand, cwkUtil):
 		for s in parser.getWordsFromWebDictionary():
 			if s not in self._words:
 				self._words.append(s)
+			
+		for s in parser.getWordsFromWebDictionary():
+			if s.startswith("\t"):
+				self.log("fetching synonyms for: ", s)
 				self.fetchKoreanSynonyms(s)
 
 
