@@ -29,11 +29,7 @@ JAPANESE_TARGET_BLOCK_TAG = 'span'
 JAPANESE_TARGET_KEYWORD = '[유의어]' 
 JAPANESE_TARGET_SYNONYM_TAG = 'a'
 
-# Python idiom: os-independent file path 
-
-package_path = os.path.join(sublime.packages_path(), "cwkWritingToolKit")
-WORD_FILE_PATH = os.path.join("Dictionaries", "dictionary.cwktxt")
-WORD_FILE_PATH  = os.path.join(package_path, WORD_FILE_PATH)
+CUSTOM_DICTIONARY_FILE = "cwkDic.cwkcsv"
 
 class cwkUtil:
 	def __init__(self):
@@ -64,12 +60,21 @@ class cwkUtil:
 		pattern = re.compile(r'<[^>]+>')
 		return pattern.sub('', line)
 
+	def getCustomDictionaryFile(self):
+	# Python idiom: os-independent file path 
+
+		package_path = os.path.join(sublime.packages_path(), "cwkWritingToolKit")
+		parent_path  = os.path.join(package_path, "Dictionaries")
+		dictionary_path = os.path.join(parent_path, self.plugin_settings.get("custom_dictionary_file", CUSTOM_DICTIONARY_FILE))
+		
+		return dictionary_path
+
 class cwkWebDicParser(HTMLParser, cwkUtil):
 	def __init__(self):
 		HTMLParser.__init__(self)
 		cwkUtil.__init__(self)
 
-	def getWords(self):
+	def getWordsFromWebDictionary(self):
 		return self._words
 
 
@@ -214,17 +219,18 @@ class CwkFetchWebDic(sublime_plugin.TextCommand, cwkUtil):
 				parser = cwkEnglishWebDicParser()
 
 				parser.feed(webpage)
-				self._words = parser.getWords()
+				self._words = parser.getWordsFromWebDictionary()
 
 			elif self.isKorean(self.currentWord):
 				self._words = []
-				self.fetchSynonyms(self.currentWord)
+				self.fetchKoreanSynonyms(self.currentWord)
 
 
 			self.log("Num synonyms found: ", len(self._words))
 			view.show_popup_menu(self._words, self.on_done)
 
-	def fetchSynonyms(self, word):
+	def fetchKoreanSynonyms(self, word):
+	# resursively fetches synonyms until _query_depth > MAX_QUERY_DEPTH
 
 		self._query_depth +=1
 
@@ -243,10 +249,10 @@ class CwkFetchWebDic(sublime_plugin.TextCommand, cwkUtil):
 		parser = cwkKoreanWebDicParser()
 
 		parser.feed(webpage)
-		for s in parser.getWords():
+		for s in parser.getWordsFromWebDictionary():
 			if s not in self._words:
 				self._words.append(s)
-				self.fetchSynonyms(s)
+				self.fetchKoreanSynonyms(s)
 
 
 	def on_done(self, index):
@@ -305,7 +311,7 @@ class CwkAutoComplete(sublime_plugin.WindowCommand, cwkUtil):
 
 		# self._words stores all found words whereas self._normalizedWords stores unique values.
 
-		self._words = self.getWords(WORD_FILE_PATH)
+		self._words = self.getWordsFromCustomDictionary(self.getCustomDictionaryFile())
 		self._normalizedWords = []
 		
 	def run(self): 
@@ -342,10 +348,10 @@ class CwkAutoComplete(sublime_plugin.WindowCommand, cwkUtil):
 
 		view.run_command("cwk_insert_selected_text", {"args": {'text': selected_string.strip()} })
 
-	def getWords(self, filename):
+	def getWordsFromCustomDictionary(self, filename):
 	# creates a autocomplete dictionary from the dictionary file
 
-		word_lines = []
+		
 		if os.path.isfile(filename): 
 
 			# normal file operations won't work with Korean characters. use codecs library instead.  
@@ -353,17 +359,26 @@ class CwkAutoComplete(sublime_plugin.WindowCommand, cwkUtil):
 
 			f = codecs.open(filename, "r", "utf-8")
 			word_lines = f.readlines()
-			self.log("cwk Dictionary Num Words Found: ", len(word_lines))
+			words = []
+			for line in word_lines:
+				temp_words = [ w.strip() for w in line.split(',') if w != '' ]
+				if temp_words:
+					keyword = temp_words[0]
+					words.append(keyword)
+					temp_words = temp_words[1:]
+					words += ["\t" + w for w in temp_words ]
+			self.log("")
+			self.log("cwk Dictionary({dic}): {num}".format(dic=filename, num=len(words)))
+			return words
 		else:
 			self.log("cwk Dictionary file not found: ", filename)
-		return word_lines
 
 	def normalizeWords(self):
 	# selects only those words that match the current word
 
 		# Python idiom: list comprehension
 		# discards the words not matching the current word and strip whitespaces at both ends
-
-		self._normalizedWords = [ w.strip() for w in self._words if self.currentWord in w ]
+		if self._words:
+			self._normalizedWords = [ w.strip() for w in self._words if self.currentWord in w ]
 		
 
