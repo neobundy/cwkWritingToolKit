@@ -14,13 +14,12 @@ Wankyu Choi <wankyuchoi@gmail.com>
 - <kbd> CTRL+OPTION+SHIFT+SPACE </kbd> (Windows/Linux)
 
     - auto-completion by fetching web dictionary entries 
+        - fetches Korean synonyms recursively
+        - fetcher runs as a thread
 
 # Todos
 
-- Add user setting: custom dictionary path
 - Add feature: auto-completion by parsing specified document files (default autocompletion add-on feature)  
-- Add feature: thread support
-- Add feature: Korean Dic
 - Add feature: Japanese Dic
 
 # Contact
@@ -46,4 +45,5 @@ Blog - http://wankyuchoi.blogspot.com/
 Email - wankyuchoi@gmail.com 
 
 ---
+
 

@@ -1,4 +1,8 @@
 {
 	// Toggle Debug Mode
-	"debug": true
+	"debug": true,
+
+	// Custom dictionary path
+
+	"custom_dictionary_file": "cwkDic.cwkcsv",
 }
