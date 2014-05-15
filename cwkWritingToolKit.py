@@ -13,7 +13,7 @@ WEB_KOREAN_DIC_URL = "http://krdic.naver.com/search.nhn?kind=all&%s"
 WEB_KOREAN_DIC_OPTIONS = "query={query}"
 
 # Japanese Dictionary: Naver
-WEB_JAPANESE_DIC_URL = "http://jpdic.naver.com/search.nhn?%s"
+WEB_JAPANESE_DIC_URL = "http://jpdic.naver.com/search.nhn?range=word&%s"
 WEB_JAPANESE_DIC_OPTIONS = "q={query}"
 
 TIME_OUT_SECONDS = 20
@@ -63,6 +63,12 @@ class cwkUtil:
 			return True
 		else: 
 			return False
+	def isJapanese(self, word):
+		if re.match(r'[一-龠あ-んア-ン]+', word):
+			return True
+		else:
+			return False
+
 	def removeTags(self, line):
 		pattern = re.compile(r'<[^>]+>')
 		return pattern.sub('', line)
@@ -293,7 +299,7 @@ class CwkWebDicFetcherThread(cwkUtil, threading.Thread):
 
 		# run Text Command cwk_insert_selected_text to replace the current word with the user's choice
 
-		view.run_command("cwk_insert_selected_text", {"args": {'text': selected_string.strip()} })
+		self.view.run_command("cwk_insert_selected_text", {"args": {'text': selected_string.strip()} })
 
 # cwk_fetch_WEB_ENGLISH_DIC text command inserts one of the synonym definitions fetched from the given web dictionary.
 # camel casing: CwkFetchWebDic
