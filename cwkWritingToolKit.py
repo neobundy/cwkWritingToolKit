@@ -22,9 +22,15 @@ ENGLISH_TARGET_BLOCK_TAG = 'span'
 ENGLISH_TARGET_SYNONYM_TAG = 'a'
 ENGLISH_TARGET_SYNONYM_LABEL = '[유의어]' 
 
+
 MAX_QUERY_DEPTH = 10
 KOREAN_TARGET_SYNONYM_TAG = 'a' 
 KOREAN_TARGET_SYNONYM_CLASS_ID = 'syno'
+KOREAN_TARGET_BLOCK_TAG = 'span'
+KOREAN_TARGET_BLOCK_CLASS_ID = 'head_word'
+KOREAN_TARGET_BLOCK_END_TAG = 'div'
+KOREAN_TARGET_BLOCK_END_CLASS_ID = 'btn_showmore'
+KOREAN_TARGET_KEYWORD_TAG = 'strong'
 
 JAPANESE_TARGET_BLOCK_TAG = 'span'
 JAPANESE_TARGET_KEYWORD = '[유의어]' 
@@ -158,25 +164,24 @@ class cwkKoreanWebDicParser(cwkWebDicParser):
 		self._is_in_block = False
 
 	def handle_starttag(self, tag, attrs):
-		if tag == 'span':
+		if tag == KOREAN_TARGET_BLOCK_TAG:
 			for name, value in attrs:
-				if name == 'class' and value == 'head_word':
+				if name == 'class' and value == KOREAN_TARGET_BLOCK_CLASS_ID:
 					self.log("in block")
 					self._is_in_block = True
-		if tag == 'div':
+		if tag == KOREAN_TARGET_BLOCK_END_TAG:
 			for name, value in attrs:
-				if name == 'class' and value == 'btn_showmore':
+				if name == 'class' and value == KOREAN_TARGET_BLOCK_END_CLASS_ID:
 					self.log("out of block")
 					self._is_in_block = False
 					self.reset_tags()
-
 
 		if self._is_in_block:
 			if tag == KOREAN_TARGET_SYNONYM_TAG:
 				for name, value in attrs:
 					if name == 'class' and value == KOREAN_TARGET_SYNONYM_CLASS_ID:
 						self._target_synonym_found = True
-			elif tag == 'strong':
+			elif tag == KOREAN_TARGET_KEYWORD_TAG:
 				self.log("keyword tag found")
 				self._target_keyword_tag_found = True
 			else:
