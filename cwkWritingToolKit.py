@@ -1,5 +1,5 @@
 import sublime, sublime_plugin
-import os, codecs, urllib, re
+import os, codecs, urllib, re, threading
 from html.parser import HTMLParser
 
 VERSION = "0.02"
@@ -16,6 +16,7 @@ WEB_KOREAN_DIC_OPTIONS = "query={query}"
 WEB_JAPANESE_DIC_URL = "http://jpdic.naver.com/search.nhn?%s"
 WEB_JAPANESE_DIC_OPTIONS = "q={query}"
 
+TIME_OUT_SECONDS = 20
 
 ENGLISH_TARGET_BLOCK_TAG = 'span'
 ENGLISH_TARGET_SYNONYM_TAG = 'a'
@@ -201,37 +202,24 @@ class cwkKoreanWebDicParser(cwkWebDicParser):
 		self._target_synonym_found = False
 		self._target_keyword_tag_found = False
 
-# cwk_fetch_WEB_ENGLISH_DIC text command inserts one of the synonym definitions fetched from the given web dictionary.
-# camel casing: CwkFetchWebDic
-# snake casing: cwk_fetch_WEB_ENGLISH_DIC 
-# Sublime Text translates camel cased commands into snake cased ones.
-# You can run snake cased command by calling the view's run_command() method as the following:
-# 	view.run_command("cwk_fetch_WEB_ENGLISH_DIC", text_to_insert)
+class CwkWebDicFetcherThread(cwkUtil, threading.Thread):
 
-class CwkFetchWebDic(sublime_plugin.TextCommand, cwkUtil):
-	def __init__(self, *args, **kwargs):
-		sublime_plugin.TextCommand.__init__(self, *args, **kwargs)
+	def __init__(self, search_keyword, view):  
 		cwkUtil.__init__(self)
-
-	def run(self, edit):
-
-		# get active window and view
-
-		window = sublime.active_window()
-		view = window.active_view()
-
+		self.search_keyword = search_keyword
+		self.view = view
+		self.timeout = TIME_OUT_SECONDS
 		self._query_depth = 0
-		# save the word at the cursor position
+		self._words = []
+		threading.Thread.__init__(self)
 
-		self.currentWord = view.substr(view.word(view.sel()[0].begin()))
+	def run(self):
+		if self.search_keyword:
+			self.log("Word selected: ", self.search_keyword)
 
-		if self.currentWord:
-			self.log("Word selected: ", self.currentWord)
-
-			if self.isEnglish(self.currentWord):
-				self._words = []
+			if self.isEnglish(self.search_keyword):
 		
-				options = WEB_ENGLISH_DIC_OPTIONS.format(query=self.currentWord)
+				options = WEB_ENGLISH_DIC_OPTIONS.format(query=self.search_keyword)
 				request = urllib.request.Request(WEB_ENGLISH_DIC_URL % options)
 
 				self.log("Web Dic URL: " , WEB_ENGLISH_DIC_URL % options)
@@ -244,13 +232,13 @@ class CwkFetchWebDic(sublime_plugin.TextCommand, cwkUtil):
 				parser.feed(webpage)
 				self._words = parser.getWordsFromWebDictionary()
 
-			elif self.isKorean(self.currentWord):
+			elif self.isKorean(self.search_keyword):
 				self._words = []
-				self.fetchKoreanSynonyms(self.currentWord)
-
+				self.fetchKoreanSynonyms(self.search_keyword)
 
 			self.log("Num synonyms found: ", len(self._words))
-			view.show_popup_menu(self._words, self.on_done)
+			if self._words:
+				self.view.show_popup_menu(self._words, self.on_done)
 
 	def fetchKoreanSynonyms(self, word):
 	# resursively fetches synonyms until _query_depth > MAX_QUERY_DEPTH
@@ -282,7 +270,11 @@ class CwkFetchWebDic(sublime_plugin.TextCommand, cwkUtil):
 		for s in parser.getWordsFromWebDictionary():
 			if s.startswith("\t"):
 				self.log("fetching synonyms for: ", s)
-				self.fetchKoreanSynonyms(s)
+				self.fetchKoreanSynonyms(s)	
+
+	def stop(self):
+		if self.isAlive():
+			self._Thread__stop()
 
 
 	def on_done(self, index):
@@ -293,12 +285,45 @@ class CwkFetchWebDic(sublime_plugin.TextCommand, cwkUtil):
 		if index == -1: return
 
 		selected_string = self._words[index]
-		window = sublime.active_window()
-		view = window.active_view()
 
 		# run Text Command cwk_insert_selected_text to replace the current word with the user's choice
 
 		view.run_command("cwk_insert_selected_text", {"args": {'text': selected_string.strip()} })
+
+# cwk_fetch_WEB_ENGLISH_DIC text command inserts one of the synonym definitions fetched from the given web dictionary.
+# camel casing: CwkFetchWebDic
+# snake casing: cwk_fetch_WEB_ENGLISH_DIC 
+# Sublime Text translates camel cased commands into snake cased ones.
+# You can run snake cased command by calling the view's run_command() method as the following:
+# 	view.run_command("cwk_fetch_WEB_ENGLISH_DIC", text_to_insert)
+
+class CwkFetchWebDic(sublime_plugin.TextCommand, cwkUtil):
+
+	_fetcher_thread = None
+
+	def __init__(self, *args, **kwargs):
+		sublime_plugin.TextCommand.__init__(self, *args, **kwargs)
+		cwkUtil.__init__(self)
+
+	def run(self, edit):
+
+		# get active window and view
+
+		window = sublime.active_window()
+		view = window.active_view()
+
+
+		# save the word at the cursor position
+
+
+		self.currentWord = view.substr(view.word(view.sel()[0].begin()))
+		self._words = []
+		if self._fetcher_thread != None:
+			self._fetcher_thread.stop()
+		self._fetcher_thread = CwkWebDicFetcherThread(self.currentWord, view)
+		self._fetcher_thread.start()
+
+
 
 # cwk_insert_selected_text command inserts text at cursor position
 # camel casing: CwkInsertSelectedText
