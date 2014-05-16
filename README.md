@@ -16,6 +16,9 @@ Wankyu Choi <wankyuchoi@gmail.com>
     - auto-completion by fetching web dictionary entries 
         - fetches Korean synonyms recursively
         - fetcher runs as a thread
+- Mac OSX only
+    
+    - Read aloud selected and replaced words using system voices: Korean, English, Japanese (automatically recognized) 
 
 # Todos
 
