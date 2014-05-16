@@ -5,4 +5,14 @@
 	// Custom dictionary path
 
 	"custom_dictionary_file": "cwkDic.cwkcsv",
+
+	// Use System Voice: Mac OSX only
+
+	"read_aloud_current_word": true,
+
+	// System Voices
+
+	"korean_voice": "Yuna",
+	"english_voice": "Samantha",
+	"japanese_voice": "Kyoko",
 }

@@ -1,5 +1,5 @@
 import sublime, sublime_plugin
-import os, codecs, urllib, re, threading
+import os, codecs, urllib, re, threading, subprocess
 from html.parser import HTMLParser
 
 VERSION = "0.02"
@@ -42,6 +42,11 @@ class cwkUtil:
 	def __init__(self):
 		self.plugin_settings = sublime.load_settings("cwkWritingToolKit.sublime-settings")
 		self.debug = self.plugin_settings.get("debug", False)
+		self.read_aloud = self.plugin_settings.get("read_aloud_current_word", False)
+		self.english_voice = self.plugin_settings.get("english_voice", False)
+		self.korean_voice = self.plugin_settings.get("korean_voice", False)
+		self.japanese_voice = self.plugin_settings.get("japanese_voice", False)
+
 		self._words = []
 
 	def log(self, *message):
@@ -81,6 +86,23 @@ class cwkUtil:
 		dictionary_path = os.path.join(parent_path, self.plugin_settings.get("custom_dictionary_file", CUSTOM_DICTIONARY_FILE))
 		
 		return dictionary_path
+
+	def readAloud(self, message):
+	# Mac OSX only: read alound the given message using system voices
+
+		if message:
+			voice = ""
+			if self.isEnglish(message):
+				voice = self.english_voice
+			elif self.isKorean(message):
+				voice = self.korean_voice
+			elif self.isJapanese(message):
+				voice = self.japanese_voice
+
+			shell_command = ["/usr/bin/say", "-v", voice, message]
+			self.log(" ".join(shell_command))
+			subprocess.call(shell_command)
+
 
 class cwkWebDicParser(HTMLParser, cwkUtil):
 	def __init__(self):
@@ -328,6 +350,9 @@ class CwkFetchWebDic(sublime_plugin.TextCommand, cwkUtil):
 
 
 		self.currentWord = view.substr(view.word(view.sel()[0].begin()))
+
+		self.readAloud(self.currentWord)
+
 		self._words = []
 		if self._fetcher_thread != None:
 			self._fetcher_thread.stop()
@@ -344,6 +369,10 @@ class CwkFetchWebDic(sublime_plugin.TextCommand, cwkUtil):
 # 	view.run_command("cwk_insert_selected_text", text_to_insert)
 
 class CwkInsertSelectedText(sublime_plugin.TextCommand, cwkUtil):
+	def __init__(self, *args, **kwargs):
+		sublime_plugin.TextCommand.__init__(self, *args, **kwargs)
+		cwkUtil.__init__(self)
+		
 	def run(self, edit, args):
 		
 		# get current cursor position
@@ -357,6 +386,8 @@ class CwkInsertSelectedText(sublime_plugin.TextCommand, cwkUtil):
 		# view.replace() replaces the selected word with the given text. edit is the buffer currently in use.
 
 		self.view.replace(edit, word_region, args['text'])
+
+		self.readAloud(args['text'])
  
 class CwkAutoComplete(sublime_plugin.WindowCommand, cwkUtil):
 	def __init__(self, window):
@@ -374,7 +405,6 @@ class CwkAutoComplete(sublime_plugin.WindowCommand, cwkUtil):
 		# save the word at the cursor position
 
 		self.currentWord = view.substr(view.word(view.sel()[0].begin()))
-
 		# self._words stores all found words whereas self._normalizedWords stores unique values.
 
 		self._words = self.getWordsFromCustomDictionary(self.getCustomDictionaryFile())
@@ -391,6 +421,9 @@ class CwkAutoComplete(sublime_plugin.WindowCommand, cwkUtil):
 		self.log("view id: ", view.view_id)
 		self.currentWord = view.substr(view.word(view.sel()[0].begin()))
 		self.log("current word:", self.currentWord)
+
+		self.readAloud(self.currentWord)
+
 		self.normalizeWords()
 
 		# view.shop_popup_menu() displays a popout menu presenting the words that contain the self.currentWord.
