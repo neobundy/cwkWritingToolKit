@@ -17,6 +17,7 @@ Wankyu Choi <wankyuchoi@gmail.com>
     - auto-completion by parsing specified document files (default autocompletion add-on feature)  
         - build corpus from recursively traversing all folders in the current window
         - collector runs as a thread
+        - switching projects rebuilds corpus 
     - auto-completion using custom dictionaries 
      
 - Mac OSX only
