@@ -2,7 +2,7 @@ import sublime, sublime_plugin
 import os, codecs, urllib, re, threading, subprocess
 from html.parser import HTMLParser
 
-VERSION = "0.02"
+VERSION = "0.1"
 
 # English Dictionary: Naver
 WEB_ENGLISH_DIC_URL = "http://endic.naver.com/search.nhn?%s"
@@ -16,14 +16,14 @@ WEB_KOREAN_DIC_OPTIONS = "query={query}"
 WEB_JAPANESE_DIC_URL = "http://jpdic.naver.com/search.nhn?range=word&%s"
 WEB_JAPANESE_DIC_OPTIONS = "q={query}"
 
-TIME_OUT_SECONDS = 20
+TIMEOUT_SECONDS = 20
 
 ENGLISH_TARGET_BLOCK_TAG = 'span'
 ENGLISH_TARGET_SYNONYM_TAG = 'a'
 ENGLISH_TARGET_SYNONYM_LABEL = '[유의어]' 
 
 
-MAX_QUERY_DEPTH = 10
+MAX_QUERY_DEPTH = 20
 KOREAN_TARGET_SYNONYM_TAG = 'a' 
 KOREAN_TARGET_SYNONYM_CLASS_ID = 'syno'
 KOREAN_TARGET_BLOCK_TAG = 'span'
@@ -36,7 +36,8 @@ JAPANESE_TARGET_BLOCK_TAG = 'span'
 JAPANESE_TARGET_KEYWORD = '[유의어]' 
 JAPANESE_TARGET_SYNONYM_TAG = 'a'
 
-CUSTOM_DICTIONARY_FILE = "cwkDic.cwkcsv"
+MIN_WORD_LEN = 2
+MAX_WORD_LEN = 100
 
 class cwkUtil:
 	def __init__(self):
@@ -46,18 +47,10 @@ class cwkUtil:
 		self.english_voice = self.plugin_settings.get("english_voice", False)
 		self.korean_voice = self.plugin_settings.get("korean_voice", False)
 		self.japanese_voice = self.plugin_settings.get("japanese_voice", False)
-
+		self.corpus_extensions = self.plugin_settings.get("corpus_extensions", [])
+		self.custom_dictionary_extensions = self.plugin_settings.get("custom_dictionary_extensions", [])
 		self._words = []
 
-	def log(self, *message):
-	# utility method to print out debug messages
-
-		# note that print is not a statement anymore in Python 3. It's a function.
-		# print "blah blah" will give you an error
-		# use print("blah blah") instead
-
-		if(self.debug):
-			print (*message)
 	def isKorean(self, word):
 		if re.match(r'(^[가-힣]+)', word): 
 			return True
@@ -74,18 +67,24 @@ class cwkUtil:
 		else:
 			return False
 
+	def is_corpus_file(self, filename):
+	# check if the given file should be parsed
+
+		fname, fextension = os.path.splitext(filename)
+		return fextension in self.corpus_extensions
+
+	def is_dictionary_file(self, filename):
+	# check if the given file is a dictionary
+
+		fname, fextension = os.path.splitext(filename)
+		return fextension in self.custom_dictionary_extensions
+
+
 	def removeTags(self, line):
+	# clean up HTML tags
+
 		pattern = re.compile(r'<[^>]+>')
 		return pattern.sub('', line)
-
-	def getCustomDictionaryFile(self):
-	# Python idiom: os-independent file path 
-
-		package_path = os.path.join(sublime.packages_path(), "cwkWritingToolKit")
-		parent_path  = os.path.join(package_path, "Dictionaries")
-		dictionary_path = os.path.join(parent_path, self.plugin_settings.get("custom_dictionary_file", CUSTOM_DICTIONARY_FILE))
-		
-		return dictionary_path
 
 	def readAloud(self, message):
 	# Mac OSX only: read alound the given message using system voices
@@ -100,9 +99,107 @@ class cwkUtil:
 				voice = self.japanese_voice
 
 			shell_command = ["/usr/bin/say", "-v", voice, message]
-			self.log(" ".join(shell_command))
 			subprocess.call(shell_command)
 
+
+	def log(self, message):
+	# utility method to print out debug messages
+
+		if(self.debug):
+			print ("[cwk log] ==  {msg}".format(msg=message))
+
+class cwkWord:
+	_name = ""
+	_filename = ""
+
+	def __init__(self, name, filename):
+		self._name = name
+		self._filename = filename
+	def name(self):
+		return self._name
+	def filename(self):
+		return self._filename
+
+class cwkCorpus(cwkUtil):
+	def __init__(self):
+		self._words = []
+		cwkUtil.__init__(self)
+
+	def clearCorpus(self):
+		self._words = []
+	def numWords(self):
+		return len(self._words)
+
+	def addWord(self, name, filename):
+		self._words.append(cwkWord(name, filename))
+
+	def get_autocomplete_list(self, word):
+		autocomplete_list = []
+		seen = []
+		for auto_word in self._words:
+			if word in auto_word.name():
+				if self.is_corpus_file(auto_word.filename()) and auto_word.name() in seen: continue
+				seen.append(auto_word.name())
+				if self.is_corpus_file(auto_word.filename()):
+					label = auto_word.name() + '\t' + auto_word.filename()
+					str_to_insert = auto_word.name()
+				else:
+					label = auto_word.name() + '\t' + auto_word.filename()
+					str_to_insert = auto_word.filename()
+				autocomplete_list.append( (label, str_to_insert) )
+		return autocomplete_list
+
+class cwkWordsCollectorThread(cwkUtil, threading.Thread):
+	def __init__(self, collector, open_folders):
+		self.collector = collector
+		self.time_out_seconds = TIMEOUT_SECONDS
+		self.open_folders = open_folders
+		threading.Thread.__init__(self)
+		cwkUtil.__init__(self)
+
+	def run(self):
+		for folder in self.open_folders:
+			files = self.getWordFiles(folder)
+			for filename in files:
+				self.collectWords(filename)
+		self.log("{num_words} word(s) found in {num_files} corpus file(s)".format(num_words=self.collector.numWords(), num_files=len(files)))
+		
+	def stop(self):
+		if self.isAlive():
+			self._Thread__stop()
+
+	def getWordFiles(self, folder, *args):
+	# resursive method parsing every corpus and dictionary file in the given folder and its subfolders
+
+		autocomplete_word_files = []
+		for file in os.listdir(folder):
+			if file.startswith('.'): continue 
+			fullpath = os.path.join(folder, file)
+
+			if os.path.isfile(fullpath) and (self.is_corpus_file(fullpath) or self.is_dictionary_file(fullpath)):
+				autocomplete_word_files.append(fullpath)
+			elif os.path.isdir(fullpath):
+				autocomplete_word_files += self.getWordFiles(fullpath, *args)
+		return autocomplete_word_files 
+
+	def collectWords(self, filename):
+		file_lines = codecs.open(filename, "r", "utf-8")
+		if self.is_corpus_file(filename):
+			# english, korean, japanese regex patterns
+			pattern = re.compile(r'([\w가-힣一-龠あ-んア-ン]+)')
+			for line in file_lines:
+				for m in re.findall(pattern, line):
+					if len(m) > MIN_WORD_LEN and len(m) < MAX_WORD_LEN:
+						self.collector.addWord(m, os.path.basename(filename))
+
+		elif self.is_dictionary_file(filename):
+			for line in file_lines:
+				words = [ w.strip() for w in line.split(',') if w != '' ]
+				if words:
+					keyword = words[0]
+					words = words[1:]
+					for w in words:
+						self.collector.addWord(keyword, w)
 
 class cwkWebDicParser(HTMLParser, cwkUtil):
 	def __init__(self):
@@ -122,7 +219,6 @@ class cwkEnglishWebDicParser(cwkWebDicParser):
 		self._target_defs_tag_found = False
 		self._is_final_tag = False
 		self.synonym = ''
-
 
 	def handle_starttag(self, tag, attrs):
 		if tag == ENGLISH_TARGET_BLOCK_TAG:
@@ -149,9 +245,7 @@ class cwkEnglishWebDicParser(cwkWebDicParser):
 	def handle_data(self, data):
 		if not self._is_in_block and self._ENGLISH_TARGET_BLOCK_TAG_found and data.strip() == ENGLISH_TARGET_SYNONYM_LABEL:
 			#keyword found: block starts.
-
 			self._is_in_block = True
-			self.log("Keyword:", data)
 		elif self._is_in_block and self._ENGLISH_TARGET_SYNONYM_TAG_found:
 			#synonym tag found: gather synonym
 
@@ -161,14 +255,12 @@ class cwkEnglishWebDicParser(cwkWebDicParser):
 		elif self._target_defs_tag_found:
 			# synonym definitions found: gather defs
 
-			self.log("Synonym:" , self.synonym)
-			self.log("Defs:", data)
 			defs = data.split(",")
 			self._words.append(self.synonym)
-			self.log("Appending synonym: ", self.synonym)
+			self.log("appending synonym: " + self.synonym)
 			for d in defs:
 				self._words.append("\t {0}".format(d))
-				self.log("Appending def: ",  d)
+				self.log("appending def: " +  d)
 			self.synonym = ''
 			self.reset_tags()
 		else:
@@ -195,12 +287,10 @@ class cwkKoreanWebDicParser(cwkWebDicParser):
 		if tag == KOREAN_TARGET_BLOCK_TAG:
 			for name, value in attrs:
 				if name == 'class' and value == KOREAN_TARGET_BLOCK_CLASS_ID:
-					self.log("in block")
 					self._is_in_block = True
 		if tag == KOREAN_TARGET_BLOCK_END_TAG:
 			for name, value in attrs:
 				if name == 'class' and value == KOREAN_TARGET_BLOCK_END_CLASS_ID:
-					self.log("out of block")
 					self._is_in_block = False
 					self.reset_tags()
 
@@ -210,7 +300,6 @@ class cwkKoreanWebDicParser(cwkWebDicParser):
 					if name == 'class' and value == KOREAN_TARGET_SYNONYM_CLASS_ID:
 						self._target_synonym_found = True
 			elif tag == KOREAN_TARGET_KEYWORD_TAG:
-				self.log("keyword tag found")
 				self._target_keyword_tag_found = True
 			else:
 				# false alarm
@@ -223,12 +312,13 @@ class cwkKoreanWebDicParser(cwkWebDicParser):
 		
 		data = self.removeTags(data)
 		if self._target_synonym_found:
-			self.log("synonym:", data)
 			if self.isKorean(data):
 				self._words.append("\t" + data)
+				self.log("appending synonym: " + data)
+
 		if self._target_keyword_tag_found:
-			self.log("Keyword: ", data)
 			self._words.append(data)
+			self.log("appending keyword: " + data)
 			self._target_keyword_tag_found = False
 
 	def reset_tags(self):
@@ -241,22 +331,17 @@ class CwkWebDicFetcherThread(cwkUtil, threading.Thread):
 		cwkUtil.__init__(self)
 		self.search_keyword = search_keyword
 		self.view = view
-		self.timeout = TIME_OUT_SECONDS
+		self.timeout_seconds = TIMEOUT_SECONDS
 		self._query_depth = 0
 		self._words = []
 		threading.Thread.__init__(self)
 
 	def run(self):
 		if self.search_keyword:
-			self.log("Word selected: ", self.search_keyword)
-
 			if self.isEnglish(self.search_keyword):
 		
 				options = WEB_ENGLISH_DIC_OPTIONS.format(query=self.search_keyword)
 				request = urllib.request.Request(WEB_ENGLISH_DIC_URL % options)
-
-				self.log("Web Dic URL: " , WEB_ENGLISH_DIC_URL % options)
-
 				response = urllib.request.urlopen(request)
 				webpage = response.read().decode('utf-8')
 
@@ -269,7 +354,7 @@ class CwkWebDicFetcherThread(cwkUtil, threading.Thread):
 				self._words = []
 				self.fetchKoreanSynonyms(self.search_keyword)
 
-			self.log("Num synonyms found: ", len(self._words))
+			self.log("{num} synonym(s) found".format(num=len(self._words)))
 			if self._words:
 				self.view.show_popup_menu(self._words, self.on_done)
 
@@ -278,17 +363,11 @@ class CwkWebDicFetcherThread(cwkUtil, threading.Thread):
 
 		self._query_depth +=1
 
-		if self._query_depth > MAX_QUERY_DEPTH: 
-			self.log("Max query depth reached: ", self._query_depth)
-			return 
-
+		if self._query_depth > MAX_QUERY_DEPTH: return 
 
 		encoded_query = urllib.parse.quote(word)
-		self.log("Encoded Korean: ", encoded_query)
 		options = WEB_KOREAN_DIC_OPTIONS.format(query=encoded_query)
 		request = urllib.request.Request(WEB_KOREAN_DIC_URL % options)
-
-		self.log("Web Dic URL: " , WEB_KOREAN_DIC_URL % options)
 
 		response = urllib.request.urlopen(request)
 		webpage = response.read().decode('utf-8')
@@ -302,13 +381,11 @@ class CwkWebDicFetcherThread(cwkUtil, threading.Thread):
 			
 		for s in parser.getWordsFromWebDictionary():
 			if s.startswith("\t"):
-				self.log("fetching synonyms for: ", s)
 				self.fetchKoreanSynonyms(s)	
 
 	def stop(self):
 		if self.isAlive():
 			self._Thread__stop()
-
 
 	def on_done(self, index):
 	#show_popup_menu callback method 
@@ -332,25 +409,20 @@ class CwkWebDicFetcherThread(cwkUtil, threading.Thread):
 
 class CwkFetchWebDic(sublime_plugin.TextCommand, cwkUtil):
 
-	_fetcher_thread = None
-
 	def __init__(self, *args, **kwargs):
 		sublime_plugin.TextCommand.__init__(self, *args, **kwargs)
 		cwkUtil.__init__(self)
+		self._fetcher_thread = None
 
 	def run(self, edit):
 
 		# get active window and view
-
 		window = sublime.active_window()
 		view = window.active_view()
 
-
 		# save the word at the cursor position
 
-
 		self.currentWord = view.substr(view.word(view.sel()[0].begin()))
-
 		self.readAloud(self.currentWord)
 
 		self._words = []
@@ -358,9 +430,7 @@ class CwkFetchWebDic(sublime_plugin.TextCommand, cwkUtil):
 			self._fetcher_thread.stop()
 		self._fetcher_thread = CwkWebDicFetcherThread(self.currentWord, view)
 		self._fetcher_thread.start()
-
-
-
+		self.log("web dic thread started")
 # cwk_insert_selected_text command inserts text at cursor position
 # camel casing: CwkInsertSelectedText
 # snake casing: cwk_insert_selected_text
@@ -389,7 +459,7 @@ class CwkInsertSelectedText(sublime_plugin.TextCommand, cwkUtil):
 
 		self.readAloud(args['text'])
  
-class CwkAutoComplete(sublime_plugin.WindowCommand, cwkUtil):
+class CwkWebDic(sublime_plugin.WindowCommand, cwkUtil):
 	def __init__(self, window):
 
 		# super() refers to the immediate ancestor: sublime_plugin.WindowCommand in this case.
@@ -405,9 +475,8 @@ class CwkAutoComplete(sublime_plugin.WindowCommand, cwkUtil):
 		# save the word at the cursor position
 
 		self.currentWord = view.substr(view.word(view.sel()[0].begin()))
-		# self._words stores all found words whereas self._normalizedWords stores unique values.
 
-		self._words = self.getWordsFromCustomDictionary(self.getCustomDictionaryFile())
+		# self._words stores all found words whereas self._normalizedWords stores unique values.
 		self._normalizedWords = []
 		
 	def run(self): 
@@ -417,10 +486,7 @@ class CwkAutoComplete(sublime_plugin.WindowCommand, cwkUtil):
 		view = window.active_view()
 
 		# self.log() spits out messages only when debug mode is on, that is, set to true.
-
-		self.log("view id: ", view.view_id)
 		self.currentWord = view.substr(view.word(view.sel()[0].begin()))
-		self.log("current word:", self.currentWord)
 
 		self.readAloud(self.currentWord)
 
@@ -439,38 +505,12 @@ class CwkAutoComplete(sublime_plugin.WindowCommand, cwkUtil):
 		if index == -1: return
 
 		selected_string = self._normalizedWords[index]
-		self.log("Word selected: " , selected_string)
 		window = sublime.active_window()
 		view = window.active_view()
 
 		# run Text Command cwk_insert_selected_text to replace the current word with the user's choice
 
 		view.run_command("cwk_insert_selected_text", {"args": {'text': selected_string.strip()} })
-
-	def getWordsFromCustomDictionary(self, filename):
-	# creates a autocomplete dictionary from the dictionary file
-
-		
-		if os.path.isfile(filename): 
-
-			# normal file operations won't work with Korean characters. use codecs library instead.  
-			# open() method returns a file handle and readlines() method returns the file contents as a list of lines.
-
-			f = codecs.open(filename, "r", "utf-8")
-			word_lines = f.readlines()
-			words = []
-			for line in word_lines:
-				temp_words = [ w.strip() for w in line.split(',') if w != '' ]
-				if temp_words:
-					keyword = temp_words[0]
-					words.append(keyword)
-					temp_words = temp_words[1:]
-					words += ["\t" + w for w in temp_words ]
-			self.log("")
-			self.log("cwk Dictionary({dic}): {num}".format(dic=filename, num=len(words)))
-			return words
-		else:
-			self.log("cwk Dictionary file not found: ", filename)
 
 	def normalizeWords(self):
 	# selects only those words that match the current word
@@ -480,4 +520,53 @@ class CwkAutoComplete(sublime_plugin.WindowCommand, cwkUtil):
 		if self._words:
 			self._normalizedWords = [ w.strip() for w in self._words if self.currentWord in w ]
 		
+
+class CwkAutoComplete(cwkCorpus, cwkUtil, sublime_plugin.EventListener):
+
+	_collector_thread = None
+	_window_id = None
+	_corpus_built = False
+
+	def buildCorpus(self):
+
+		window = sublime.active_window()
+
+		# corpus already built for this project
+		if self._corpus_built and window.id() == self._window_id: return
+
+		self._window_id = window.id()
+		view = window.active_view()
+
+		self.clearCorpus()
+		self._corpus_built = True
+
+		open_folders = view.window().folders()
+
+		cwkUtil.log(self, "building corpus for window id {id}".format(id=self._window_id))
+		if self._collector_thread != None:
+			self._collector_thread.stop()
+		self._collector_thread = cwkWordsCollectorThread(self, open_folders)
+		self._collector_thread.start()
+
+
+
+	def on_new(self, view):
+		self.buildCorpus()
+
+	def on_load(self, view):
+		self.buildCorpus()
+
+	def on_activated(self, view):
+		self.buildCorpus()
+
+	def on_post_save(self, view):
+		self.buildCorpus()
+
+	def on_query_completions(self, view, prefix, locations):
+		current_file = view.file_name()
+		completions = []
+		if self.is_corpus_file(current_file):
+			return self.get_autocomplete_list(prefix)
+			completions.sort()
+		return (completions, sublime.INHIBIT_EXPLICIT_COMPLETIONS)
 

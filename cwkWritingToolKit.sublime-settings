@@ -2,10 +2,6 @@
 	// Toggle Debug Mode
 	"debug": true,
 
-	// Custom dictionary path
-
-	"custom_dictionary_file": "cwkDic.cwkcsv",
-
 	// Use System Voice: Mac OSX only
 
 	"read_aloud_current_word": true,
@@ -15,4 +11,13 @@
 	"korean_voice": "Yuna",
 	"english_voice": "Samantha",
 	"japanese_voice": "Kyoko",
+
+	// Corpus file xtensions 
+
+	"corpus_extensions": [".cwktxt", ".md"],
+
+	// Custom dictionary file extensions: must be a comma seperated values(csv): keyword, element1, element2, element3, etc
+
+	"custom_dictionary_extensions": [".cwkcsv",],
+
 }
