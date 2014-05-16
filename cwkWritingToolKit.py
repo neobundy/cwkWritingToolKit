@@ -2,7 +2,7 @@ import sublime, sublime_plugin
 import os, codecs, urllib, re, threading, subprocess
 from html.parser import HTMLParser
 
-VERSION = "0.1"
+VERSION = "0.1b"
 
 # English Dictionary: Naver
 WEB_ENGLISH_DIC_URL = "http://endic.naver.com/search.nhn?%s"
@@ -548,10 +548,6 @@ class CwkAutoComplete(cwkCorpus, cwkUtil, sublime_plugin.EventListener):
 		self._collector_thread = cwkWordsCollectorThread(self, open_folders)
 		self._collector_thread.start()
 
-
-
-	def on_new(self, view):
-		self.buildCorpus()
 
 	def on_load(self, view):
 		self.buildCorpus()
