@@ -53,7 +53,7 @@ class cwkUtil:
 		self.corpus_extensions = self.plugin_settings.get("corpus_extensions", [])
 		self.custom_dictionary_extensions = self.plugin_settings.get("custom_dictionary_extensions", [])
 		self.force_rebuild_corpus_on_every_save = self.plugin_settings.get("force_rebuild_corpus_on_every_save", False)
-		self.max_auto_complete_suggestions = self.plugin_settings.get("max_auto_complete_suggestions", MAX_AUTOCOMPLETE_SUGGETIONS)
+		self.max_autocomplete_suggestions = self.plugin_settings.get("max_autocomplete_suggestions", MAX_AUTOCOMPLETE_SUGGETIONS)
 		self._words = []
 
 	def isKorean(self, word):
@@ -143,7 +143,7 @@ class cwkCorpus(cwkUtil):
 		seen = []
 		word_count = 0
 		for auto_word in self._words:
-			if word_count > self.max_auto_complete_suggestions: break
+			if word_count > self.max_autocomplete_suggestions: break
 			if word in auto_word.name():
 				if self.is_corpus_file(auto_word.filename()) and auto_word.name() in seen: continue
 				seen.append(auto_word.name())

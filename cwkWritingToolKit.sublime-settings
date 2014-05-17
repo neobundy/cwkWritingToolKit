@@ -26,5 +26,5 @@
 
 	// Maximum autocomplete suggestions
 
-	"max_auto_complete_suggestions": 200,
+	"max_autocomplete_suggestions": 200,
 }
