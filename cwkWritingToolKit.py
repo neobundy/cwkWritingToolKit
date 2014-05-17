@@ -49,6 +49,7 @@ class cwkUtil:
 		self.japanese_voice = self.plugin_settings.get("japanese_voice", False)
 		self.corpus_extensions = self.plugin_settings.get("corpus_extensions", [])
 		self.custom_dictionary_extensions = self.plugin_settings.get("custom_dictionary_extensions", [])
+		self.force_rebuild_corpus_on_every_save = self.plugin_settings.get("force_rebuild_corpus_on_every_save", False)
 		self._words = []
 
 	def isKorean(self, word):
@@ -532,7 +533,8 @@ class CwkAutoComplete(cwkCorpus, cwkUtil, sublime_plugin.EventListener):
 		window = sublime.active_window()
 
 		# corpus already built for this project
-		if self._corpus_built and window.id() == self._window_id: return
+		settings = cwkUtil()
+		if self._corpus_built and window.id() == self._window_id and not settings.force_rebuild_corpus_on_every_save: return
 
 		self._window_id = window.id()
 		view = window.active_view()
@@ -547,17 +549,6 @@ class CwkAutoComplete(cwkCorpus, cwkUtil, sublime_plugin.EventListener):
 			self._collector_thread.stop()
 		self._collector_thread = cwkWordsCollectorThread(self, open_folders)
 		self._collector_thread.start()
-
-
-
-	def on_new(self, view):
-		self.buildCorpus()
-
-	def on_load(self, view):
-		self.buildCorpus()
-
-	def on_activated(self, view):
-		self.buildCorpus()
 
 	def on_post_save(self, view):
 		self.buildCorpus()

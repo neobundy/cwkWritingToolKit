@@ -20,4 +20,8 @@
 
 	"custom_dictionary_extensions": [".cwkcsv",],
 
+	// Force rebuilding corpus on every save
+
+	"force_rebuild_corpus_on_every_save": true,
+
 }
