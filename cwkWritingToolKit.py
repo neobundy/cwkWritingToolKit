@@ -38,6 +38,7 @@ JAPANESE_TARGET_SYNONYM_TAG = 'a'
 
 MIN_WORD_LEN = 2
 MAX_WORD_LEN = 100
+CUSTOM_DICTIONARY_COMMENT_CHAR = '#'
 
 class cwkUtil:
 	def __init__(self):
@@ -195,6 +196,8 @@ class cwkWordsCollectorThread(cwkUtil, threading.Thread):
 
 		elif self.is_dictionary_file(filename):
 			for line in file_lines:
+				line = line.strip()
+				if line.startswith(CUSTOM_DICTIONARY_COMMENT_CHAR): continue
 				words = [ w.strip() for w in line.split(',') if w != '' ]
 				if words:
 					keyword = words[0]
