@@ -125,10 +125,20 @@ class cwkWord:
 	def __init__(self, name, filename):
 		self._name = name
 		self._filename = filename
+	@property
 	def name(self):
-		return self._name
+	    return self._name
+	@name.setter
+	def name(self, value):
+	    self._name = value
+
+	@property
 	def filename(self):
-		return self._filename
+	    return self._filename
+	@filename.setter
+	def filename(self, value):
+	    self._filename = value
+
 
 class cwkCorpus(cwkBase):
 	def __init__(self):
