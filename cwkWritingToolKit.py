@@ -38,6 +38,9 @@ JAPANESE_TARGET_SYNONYM_TAG = 'a'
 
 MIN_WORD_LEN = 2
 MAX_WORD_LEN = 100
+CUSTOM_DICTIONARY_COMMENT_CHAR = '#'
+
+MAX_AUTOCOMPLETE_SUGGETIONS = 100
 
 class cwkUtil:
 	def __init__(self):
@@ -49,6 +52,8 @@ class cwkUtil:
 		self.japanese_voice = self.plugin_settings.get("japanese_voice", False)
 		self.corpus_extensions = self.plugin_settings.get("corpus_extensions", [])
 		self.custom_dictionary_extensions = self.plugin_settings.get("custom_dictionary_extensions", [])
+		self.force_rebuild_corpus_on_every_save = self.plugin_settings.get("force_rebuild_corpus_on_every_save", False)
+		self.max_autocomplete_suggestions = self.plugin_settings.get("max_autocomplete_suggestions", MAX_AUTOCOMPLETE_SUGGETIONS)
 		self._words = []
 
 	def isKorean(self, word):
@@ -68,26 +73,29 @@ class cwkUtil:
 			return False
 
 	def is_corpus_file(self, filename):
-	# check if the given file should be parsed
+		"""check if the given file should be parsed
+		"""
 
 		fname, fextension = os.path.splitext(filename)
 		return fextension in self.corpus_extensions
 
 	def is_dictionary_file(self, filename):
-	# check if the given file is a dictionary
+		"""check if the given file is a dictionary
+		"""
 
 		fname, fextension = os.path.splitext(filename)
 		return fextension in self.custom_dictionary_extensions
 
 
 	def removeTags(self, line):
-	# clean up HTML tags
-
+		"""clean up HTML tags
+		"""
 		pattern = re.compile(r'<[^>]+>')
 		return pattern.sub('', line)
 
 	def readAloud(self, message):
-	# Mac OSX only: read alound the given message using system voices
+		"""Mac OSX only: read alound the given message using system voices
+		"""
 
 		if message:
 			voice = ""
@@ -103,10 +111,12 @@ class cwkUtil:
 
 
 	def log(self, message):
-	# utility method to print out debug messages
+		"""utility method to print out debug messages
+		"""
 
 		if(self.debug):
 			print ("[cwk log] ==  {msg}".format(msg=message))
+
 
 class cwkWord:
 	_name = ""
@@ -136,7 +146,9 @@ class cwkCorpus(cwkUtil):
 	def get_autocomplete_list(self, word):
 		autocomplete_list = []
 		seen = []
+		word_count = 0
 		for auto_word in self._words:
+			if word_count > self.max_autocomplete_suggestions: break
 			if word in auto_word.name():
 				if self.is_corpus_file(auto_word.filename()) and auto_word.name() in seen: continue
 				seen.append(auto_word.name())
@@ -147,6 +159,7 @@ class cwkCorpus(cwkUtil):
 					label = auto_word.name() + '\t' + auto_word.filename()
 					str_to_insert = auto_word.filename()
 				autocomplete_list.append( (label, str_to_insert) )
+				word_count +=1
 		return autocomplete_list
 
 class cwkWordsCollectorThread(cwkUtil, threading.Thread):
@@ -169,7 +182,8 @@ class cwkWordsCollectorThread(cwkUtil, threading.Thread):
 			self._Thread__stop()
 
 	def getWordFiles(self, folder, *args):
-	# resursive method parsing every corpus and dictionary file in the given folder and its subfolders
+		"""resursive method parsing every corpus and dictionary file in the given folder and its subfolders
+		"""
 
 		autocomplete_word_files = []
 		for file in os.listdir(folder):
@@ -194,6 +208,8 @@ class cwkWordsCollectorThread(cwkUtil, threading.Thread):
 
 		elif self.is_dictionary_file(filename):
 			for line in file_lines:
+				line = line.strip()
+				if line.startswith(CUSTOM_DICTIONARY_COMMENT_CHAR): continue
 				words = [ w.strip() for w in line.split(',') if w != '' ]
 				if words:
 					keyword = words[0]
@@ -359,7 +375,8 @@ class CwkWebDicFetcherThread(cwkUtil, threading.Thread):
 				self.view.show_popup_menu(self._words, self.on_done)
 
 	def fetchKoreanSynonyms(self, word):
-	# resursively fetches synonyms until _query_depth > MAX_QUERY_DEPTH
+		"""resursively fetches synonyms until _query_depth > MAX_QUERY_DEPTH
+		"""
 
 		self._query_depth +=1
 
@@ -388,8 +405,9 @@ class CwkWebDicFetcherThread(cwkUtil, threading.Thread):
 			self._Thread__stop()
 
 	def on_done(self, index):
-	#show_popup_menu callback method 
-	
+		"""show_popup_menu callback method 
+		"""
+
 		# if the use canceled out of the popout menu, -1 is returned. Otherwise the index is returned.
 
 		if index == -1: return
@@ -431,6 +449,7 @@ class CwkFetchWebDic(sublime_plugin.TextCommand, cwkUtil):
 		self._fetcher_thread = CwkWebDicFetcherThread(self.currentWord, view)
 		self._fetcher_thread.start()
 		self.log("web dic thread started")
+
 # cwk_insert_selected_text command inserts text at cursor position
 # camel casing: CwkInsertSelectedText
 # snake casing: cwk_insert_selected_text
@@ -480,7 +499,8 @@ class CwkWebDic(sublime_plugin.WindowCommand, cwkUtil):
 		self._normalizedWords = []
 		
 	def run(self): 
-	# run method is triggered when this cwk_auto_comoplete command is called
+		"""run method is triggered when this cwk_auto_comoplete command is called
+		"""
 
 		window = sublime.active_window()
 		view = window.active_view()
@@ -498,8 +518,8 @@ class CwkWebDic(sublime_plugin.WindowCommand, cwkUtil):
 		view.show_popup_menu(self._normalizedWords, self.on_done)
 
 	def on_done(self, index):
-	#show_popup_menu callback method 
-	
+		"""show_popup_menu callback method 
+		"""
 		# if the use canceled out of the popout menu, -1 is returned. Otherwise the index is returned.
 
 		if index == -1: return
@@ -513,8 +533,9 @@ class CwkWebDic(sublime_plugin.WindowCommand, cwkUtil):
 		view.run_command("cwk_insert_selected_text", {"args": {'text': selected_string.strip()} })
 
 	def normalizeWords(self):
-	# selects only those words that match the current word
-
+		"""selects only those words that match the current word
+		"""
+		
 		# Python idiom: list comprehension
 		# discards the words not matching the current word and strip whitespaces at both ends
 		if self._words:
@@ -532,7 +553,8 @@ class CwkAutoComplete(cwkCorpus, cwkUtil, sublime_plugin.EventListener):
 		window = sublime.active_window()
 
 		# corpus already built for this project
-		if self._corpus_built and window.id() == self._window_id: return
+		settings = cwkUtil()
+		if self._corpus_built and window.id() == self._window_id and not settings.force_rebuild_corpus_on_every_save: return
 
 		self._window_id = window.id()
 		view = window.active_view()
@@ -547,13 +569,6 @@ class CwkAutoComplete(cwkCorpus, cwkUtil, sublime_plugin.EventListener):
 			self._collector_thread.stop()
 		self._collector_thread = cwkWordsCollectorThread(self, open_folders)
 		self._collector_thread.start()
-
-
-	def on_load(self, view):
-		self.buildCorpus()
-
-	def on_activated(self, view):
-		self.buildCorpus()
 
 	def on_post_save(self, view):
 		self.buildCorpus()
