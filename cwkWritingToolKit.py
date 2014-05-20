@@ -1,5 +1,5 @@
 import sublime, sublime_plugin
-import os, codecs, urllib, re, threading, subprocess
+import os, sys, codecs, urllib, re, threading, subprocess
 from html.parser import HTMLParser
 
 VERSION = "0.1"
@@ -97,6 +97,8 @@ class cwkBase:
 		"""Mac OSX only: read alound the given message using system voices
 		"""
 
+		if sys.platform != 'darwin': return
+
 		if message:
 			voice = ""
 			if self.isEnglish(message):
@@ -125,6 +127,7 @@ class cwkWord:
 	def __init__(self, name, filename):
 		self._name = name
 		self._filename = filename
+		
 	@property
 	def name(self):
 	    return self._name
