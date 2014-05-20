@@ -1,5 +1,5 @@
 import sublime, sublime_plugin
-import os, codecs, urllib, re, threading, subprocess
+import os, sys, codecs, urllib, re, threading, subprocess
 from html.parser import HTMLParser
 
 VERSION = "0.1b"
@@ -42,7 +42,7 @@ CUSTOM_DICTIONARY_COMMENT_CHAR = '#'
 
 MAX_AUTOCOMPLETE_SUGGETIONS = 100
 
-class cwkUtil:
+class cwkBase:
 	def __init__(self):
 		self.plugin_settings = sublime.load_settings("cwkWritingToolKit.sublime-settings")
 		self.debug = self.plugin_settings.get("debug", False)
@@ -97,6 +97,8 @@ class cwkUtil:
 		"""Mac OSX only: read alound the given message using system voices
 		"""
 
+		if sys.platform != 'darwin': return
+
 		if message:
 			voice = ""
 			if self.isEnglish(message):
@@ -125,15 +127,26 @@ class cwkWord:
 	def __init__(self, name, filename):
 		self._name = name
 		self._filename = filename
+		
+	@property
 	def name(self):
-		return self._name
-	def filename(self):
-		return self._filename
+	    return self._name
+	@name.setter
+	def name(self, value):
+	    self._name = value
 
-class cwkCorpus(cwkUtil):
+	@property
+	def filename(self):
+	    return self._filename
+	@filename.setter
+	def filename(self, value):
+	    self._filename = value
+
+
+class cwkCorpus(cwkBase):
 	def __init__(self):
 		self._words = []
-		cwkUtil.__init__(self)
+		cwkBase.__init__(self)
 
 	def clearCorpus(self):
 		self._words = []
@@ -162,13 +175,13 @@ class cwkCorpus(cwkUtil):
 				word_count +=1
 		return autocomplete_list
 
-class cwkWordsCollectorThread(cwkUtil, threading.Thread):
+class cwkWordsCollectorThread(cwkBase, threading.Thread):
 	def __init__(self, collector, open_folders):
 		self.collector = collector
 		self.time_out_seconds = TIMEOUT_SECONDS
 		self.open_folders = open_folders
 		threading.Thread.__init__(self)
-		cwkUtil.__init__(self)
+		cwkBase.__init__(self)
 
 	def run(self):
 		for folder in self.open_folders:
@@ -217,10 +230,10 @@ class cwkWordsCollectorThread(cwkUtil, threading.Thread):
 					for w in words:
 						self.collector.addWord(keyword, w)
 
-class cwkWebDicParser(HTMLParser, cwkUtil):
+class cwkWebDicParser(HTMLParser, cwkBase):
 	def __init__(self):
 		HTMLParser.__init__(self)
-		cwkUtil.__init__(self)
+		cwkBase.__init__(self)
 
 	def getWordsFromWebDictionary(self):
 		return self._words
@@ -341,10 +354,10 @@ class cwkKoreanWebDicParser(cwkWebDicParser):
 		self._target_synonym_found = False
 		self._target_keyword_tag_found = False
 
-class CwkWebDicFetcherThread(cwkUtil, threading.Thread):
+class CwkWebDicFetcherThread(cwkBase, threading.Thread):
 
 	def __init__(self, search_keyword, view):  
-		cwkUtil.__init__(self)
+		cwkBase.__init__(self)
 		self.search_keyword = search_keyword
 		self.view = view
 		self.timeout_seconds = TIMEOUT_SECONDS
@@ -425,11 +438,11 @@ class CwkWebDicFetcherThread(cwkUtil, threading.Thread):
 # You can run snake cased command by calling the view's run_command() method as the following:
 # 	view.run_command("cwk_fetch_WEB_ENGLISH_DIC", text_to_insert)
 
-class CwkFetchWebDic(sublime_plugin.TextCommand, cwkUtil):
+class CwkFetchWebDic(sublime_plugin.TextCommand, cwkBase):
 
 	def __init__(self, *args, **kwargs):
 		sublime_plugin.TextCommand.__init__(self, *args, **kwargs)
-		cwkUtil.__init__(self)
+		cwkBase.__init__(self)
 		self._fetcher_thread = None
 
 	def run(self, edit):
@@ -457,10 +470,10 @@ class CwkFetchWebDic(sublime_plugin.TextCommand, cwkUtil):
 # You can run snake cased command by calling the view's run_command() method as the following:
 # 	view.run_command("cwk_insert_selected_text", text_to_insert)
 
-class CwkInsertSelectedText(sublime_plugin.TextCommand, cwkUtil):
+class CwkInsertSelectedText(sublime_plugin.TextCommand, cwkBase):
 	def __init__(self, *args, **kwargs):
 		sublime_plugin.TextCommand.__init__(self, *args, **kwargs)
-		cwkUtil.__init__(self)
+		cwkBase.__init__(self)
 		
 	def run(self, edit, args):
 		
@@ -478,13 +491,13 @@ class CwkInsertSelectedText(sublime_plugin.TextCommand, cwkUtil):
 
 		self.readAloud(args['text'])
  
-class CwkWebDic(sublime_plugin.WindowCommand, cwkUtil):
+class CwkWebDic(sublime_plugin.WindowCommand, cwkBase):
 	def __init__(self, window):
 
 		# super() refers to the immediate ancestor: sublime_plugin.WindowCommand in this case.
 
 		super().__init__(window)
-		cwkUtil.__init__(self)
+		cwkBase.__init__(self)
 
 		# get active window and view
 
@@ -542,7 +555,7 @@ class CwkWebDic(sublime_plugin.WindowCommand, cwkUtil):
 			self._normalizedWords = [ w.strip() for w in self._words if self.currentWord in w ]
 		
 
-class CwkAutoComplete(cwkCorpus, cwkUtil, sublime_plugin.EventListener):
+class CwkAutoComplete(cwkCorpus, cwkBase, sublime_plugin.EventListener):
 
 	_collector_thread = None
 	_window_id = None
@@ -553,7 +566,7 @@ class CwkAutoComplete(cwkCorpus, cwkUtil, sublime_plugin.EventListener):
 		window = sublime.active_window()
 
 		# corpus already built for this project
-		settings = cwkUtil()
+		settings = cwkBase()
 		if self._corpus_built and window.id() == self._window_id and not settings.force_rebuild_corpus_on_every_save: return
 
 		self._window_id = window.id()
@@ -564,7 +577,7 @@ class CwkAutoComplete(cwkCorpus, cwkUtil, sublime_plugin.EventListener):
 
 		open_folders = view.window().folders()
 
-		cwkUtil.log(self, "building corpus for window id {id}".format(id=self._window_id))
+		cwkBase.log(self, "building corpus for window id {id}".format(id=self._window_id))
 		if self._collector_thread != None:
 			self._collector_thread.stop()
 		self._collector_thread = cwkWordsCollectorThread(self, open_folders)
