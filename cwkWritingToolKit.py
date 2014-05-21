@@ -75,17 +75,23 @@ class cwkBase:
 	def is_corpus_file(self, filename):
 		"""check if the given file should be parsed
 		"""
+		try:
+			fname, fextension = os.path.splitext(filename)
+			return fextension in self.corpus_extensions
+		except AttributeError as e:
+			self.log("Error reading {filename}: {error}".format(filename=filename, error=e))
+			return False
 
-		fname, fextension = os.path.splitext(filename)
-		return fextension in self.corpus_extensions
 
 	def is_dictionary_file(self, filename):
 		"""check if the given file is a dictionary
 		"""
-
-		fname, fextension = os.path.splitext(filename)
-		return fextension in self.custom_dictionary_extensions
-
+		try:
+			fname, fextension = os.path.splitext(filename)
+			return fextension in self.custom_dictionary_extensions
+		except AttributeError as e:
+			self.log("Error reading {filename}: {error}".format(filename=filename, error=e))
+			return False
 
 	def removeTags(self, line):
 		"""clean up HTML tags
@@ -162,15 +168,15 @@ class cwkCorpus(cwkBase):
 		word_count = 0
 		for auto_word in self._words:
 			if word_count > self.max_autocomplete_suggestions: break
-			if word in auto_word.name():
-				if self.is_corpus_file(auto_word.filename()) and auto_word.name() in seen: continue
-				seen.append(auto_word.name())
-				if self.is_corpus_file(auto_word.filename()):
-					label = auto_word.name() + '\t' + auto_word.filename()
-					str_to_insert = auto_word.name()
+			if word in auto_word.name:
+				if self.is_corpus_file(auto_word.filename) and auto_word.name in seen: continue
+				seen.append(auto_word.name)
+				if self.is_corpus_file(auto_word.filename):
+					label = auto_word.name + '\t' + auto_word.filename
+					str_to_insert = auto_word.name
 				else:
-					label = auto_word.name() + '\t' + auto_word.filename()
-					str_to_insert = auto_word.filename()
+					label = auto_word.name + '\t' + auto_word.filename
+					str_to_insert = auto_word.filename
 				autocomplete_list.append( (label, str_to_insert) )
 				word_count +=1
 		return autocomplete_list
