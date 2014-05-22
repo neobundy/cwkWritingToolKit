@@ -244,17 +244,18 @@ class cwkWordsCollectorThread(cwkBase, threading.Thread):
 						self.collector.addWord(keyword, w)
 
 class cwkWebDicParser(HTMLParser, cwkBase):
-	def __init__(self):
+	def __init__(self, view):
 		HTMLParser.__init__(self)
 		cwkBase.__init__(self)
+		self.view = view
 
 	def getWordsFromWebDictionary(self):
 		return self._words
 
 
 class cwkEnglishWebDicParser(cwkWebDicParser):
-	def __init__(self):
-		cwkWebDicParser.__init__(self)
+	def __init__(self, view):
+		cwkWebDicParser.__init__(self, view)
 		self._is_in_block = False
 		self._ENGLISH_TARGET_BLOCK_TAG_found = False
 		self._ENGLISH_TARGET_SYNONYM_TAG_found = False
@@ -300,9 +301,11 @@ class cwkEnglishWebDicParser(cwkWebDicParser):
 			defs = data.split(",")
 			self._words.append(self.synonym)
 			self.log("appending synonym: " + self.synonym)
+			self.view.set_status('cwkWritingToolKit', 'Add synonym: ' + self.synonym)
 			for d in defs:
 				self._words.append("\t {0}".format(d))
 				self.log("appending def: " +  d)
+				self.view.set_status('cwkWritingToolKit', 'Adding definition: ' + d)
 			self.synonym = ''
 			self.reset_tags()
 		else:
@@ -319,8 +322,8 @@ class cwkEnglishWebDicParser(cwkWebDicParser):
 		self._is_final_tag = False
 
 class cwkKoreanWebDicParser(cwkWebDicParser):
-	def __init__(self):
-		cwkWebDicParser.__init__(self)
+	def __init__(self, view):
+		cwkWebDicParser.__init__(self, view)
 		self._target_synonym_found = False
 		self._target_keyword_tag_found = False
 		self._is_in_block = False
@@ -357,10 +360,12 @@ class cwkKoreanWebDicParser(cwkWebDicParser):
 			if self.isKorean(data):
 				self._words.append("\t" + data)
 				self.log("appending synonym: " + data)
+				self.view.set_status('cwkWritingToolKit', 'Adding synonym: ' + data)
 
 		if self._target_keyword_tag_found:
 			self._words.append(data)
 			self.log("appending keyword: " + data)
+			self.view.set_status('cwkWritingToolKit', 'Adding keyword: ' + data)
 			self._target_keyword_tag_found = False
 
 	def reset_tags(self):
@@ -382,6 +387,7 @@ class CwkWebDicFetcherThread(cwkBase, threading.Thread):
 
 	def run(self):
 		if self.search_keyword:
+			self.view.set_status('cwkWritingToolKit', 'Starting web dic thread')
 			if self.force_mode == 'Korean':
 				self._words = []
 				self.fetchKoreanSynonyms(self.search_keyword)
@@ -391,7 +397,7 @@ class CwkWebDicFetcherThread(cwkBase, threading.Thread):
 				response = urllib.request.urlopen(request)
 				webpage = response.read().decode('utf-8')
 
-				parser = cwkEnglishWebDicParser()
+				parser = cwkEnglishWebDicParser(self.view)
 
 				parser.feed(webpage)
 				self._words = parser.getWordsFromWebDictionary()
@@ -405,7 +411,7 @@ class CwkWebDicFetcherThread(cwkBase, threading.Thread):
 					response = urllib.request.urlopen(request)
 					webpage = response.read().decode('utf-8')
 
-					parser = cwkEnglishWebDicParser()
+					parser = cwkEnglishWebDicParser(self.view)
 
 					parser.feed(webpage)
 					self._words = parser.getWordsFromWebDictionary()
@@ -415,8 +421,9 @@ class CwkWebDicFetcherThread(cwkBase, threading.Thread):
 					self.fetchKoreanSynonyms(self.search_keyword)
 				elif self.isJapanese(self.search_keyword):
 					self.log("Feature not implemented yet.")
-
-			self.log("{num} synonym(s) found".format(num=len(self._words)))
+			log_message = "{num} synonym(s) found for '{word}'".format(num=len(self._words), word=self.search_keyword)
+			self.log(log_message)
+			self.view.set_status('cwkWritingToolKit', log_message)
 			if self._words:
 				self.showWebDic()
 
@@ -490,7 +497,7 @@ class CwkFetchWebDic(sublime_plugin.TextCommand, cwkBase):
 	def run(self, edit, force_mode=False):
 
 		self.force_mode = force_mode
-		
+
 		# get active window and view
 		window = sublime.active_window()
 		view = window.active_view()
