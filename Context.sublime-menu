@@ -1,0 +1,33 @@
+[
+    {
+        "id": "cwkwritingtoolkit",
+        "caption": "cwkWritingToolKit",
+        "children":
+        [
+          
+            {
+                "caption": "Look up web dictionary",
+                "command": "cwk_fetch_web_dic", "args": {"force_mode": ""}
+            },
+            {
+                "caption": "Force Language Mode",
+                "children":
+                [
+                    {
+                        "caption": "Look up Korean", "command": "cwk_fetch_web_dic", "args": {"force_mode": "Korean"}
+                    },
+                    {
+                        "caption": "Look up English", "command": "cwk_fetch_web_dic", "args": {"force_mode": "English"}
+                    },
+                    {
+                        "caption": "Look up Japanese", "command": "cwk_fetch_web_dic", "args": {"force_mode": "Japanese"}
+                    },
+
+                    
+                ]
+            },
+
+
+        ]
+    }
+]

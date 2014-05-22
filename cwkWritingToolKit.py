@@ -2,7 +2,7 @@ import sublime, sublime_plugin
 import os, sys, codecs, urllib, re, threading, subprocess
 from html.parser import HTMLParser
 
-VERSION = "0.1b"
+VERSION = "0.2b"
 
 # English Dictionary: Naver
 WEB_ENGLISH_DIC_URL = "http://endic.naver.com/search.nhn?%s"
@@ -369,7 +369,7 @@ class cwkKoreanWebDicParser(cwkWebDicParser):
 
 class CwkWebDicFetcherThread(cwkBase, threading.Thread):
 
-	def __init__(self, search_keyword, window, view):  
+	def __init__(self, search_keyword, window, view, force_mode):  
 		cwkBase.__init__(self)
 		self.search_keyword = search_keyword
 		self.window = window
@@ -377,12 +377,15 @@ class CwkWebDicFetcherThread(cwkBase, threading.Thread):
 		self.timeout_seconds = TIMEOUT_SECONDS
 		self._query_depth = 0
 		self._words = []
+		self.force_mode = force_mode
 		threading.Thread.__init__(self)
 
 	def run(self):
 		if self.search_keyword:
-			if self.isEnglish(self.search_keyword):
-		
+			if self.force_mode == 'Korean':
+				self._words = []
+				self.fetchKoreanSynonyms(self.search_keyword)
+			elif self.force_mode == 'English':
 				options = WEB_ENGLISH_DIC_OPTIONS.format(query=self.search_keyword)
 				request = urllib.request.Request(WEB_ENGLISH_DIC_URL % options)
 				response = urllib.request.urlopen(request)
@@ -392,10 +395,26 @@ class CwkWebDicFetcherThread(cwkBase, threading.Thread):
 
 				parser.feed(webpage)
 				self._words = parser.getWordsFromWebDictionary()
+			elif self.force_mode == 'Japanese':
+				self.log("Feature not implemented yet.")
+			else:
+				if self.isEnglish(self.search_keyword):
+			
+					options = WEB_ENGLISH_DIC_OPTIONS.format(query=self.search_keyword)
+					request = urllib.request.Request(WEB_ENGLISH_DIC_URL % options)
+					response = urllib.request.urlopen(request)
+					webpage = response.read().decode('utf-8')
 
-			elif self.isKorean(self.search_keyword):
-				self._words = []
-				self.fetchKoreanSynonyms(self.search_keyword)
+					parser = cwkEnglishWebDicParser()
+
+					parser.feed(webpage)
+					self._words = parser.getWordsFromWebDictionary()
+
+				elif self.isKorean(self.search_keyword):
+					self._words = []
+					self.fetchKoreanSynonyms(self.search_keyword)
+				elif self.isJapanese(self.search_keyword):
+					self.log("Feature not implemented yet.")
 
 			self.log("{num} synonym(s) found".format(num=len(self._words)))
 			if self._words:
@@ -466,9 +485,12 @@ class CwkFetchWebDic(sublime_plugin.TextCommand, cwkBase):
 		sublime_plugin.TextCommand.__init__(self, *args, **kwargs)
 		cwkBase.__init__(self)
 		self._fetcher_thread = None
+		self.force_mode = False
 
-	def run(self, edit):
+	def run(self, edit, force_mode=False):
 
+		self.force_mode = force_mode
+		
 		# get active window and view
 		window = sublime.active_window()
 		view = window.active_view()
@@ -481,7 +503,7 @@ class CwkFetchWebDic(sublime_plugin.TextCommand, cwkBase):
 		self._words = []
 		if self._fetcher_thread != None:
 			self._fetcher_thread.stop()
-		self._fetcher_thread = CwkWebDicFetcherThread(self.currentWord, window, view)
+		self._fetcher_thread = CwkWebDicFetcherThread(self.currentWord, window, view, force_mode)
 		self._fetcher_thread.start()
 		self.log("web dic thread started")
 
