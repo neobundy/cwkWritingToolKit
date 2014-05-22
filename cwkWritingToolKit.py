@@ -198,8 +198,11 @@ class cwkWordsCollectorThread(cwkBase, threading.Thread):
 		
 	def stop(self):
 		if self.isAlive():
-			self._Thread__stop()
-
+			try:
+				self._Thread__stop()
+			except AttributeError as e:
+				self.log("Thread error: {error}".format(error=e))
+			
 	def getWordFiles(self, folder, *args):
 		"""resursive method parsing every corpus and dictionary file in the given folder and its subfolders
 		"""
