@@ -442,10 +442,10 @@ class CwkWebDicFetcherThread(cwkBase, threading.Thread):
 
 # cwk_fetch_WEB_ENGLISH_DIC text command inserts one of the synonym definitions fetched from the given web dictionary.
 # camel casing: CwkFetchWebDic
-# snake casing: cwk_fetch_WEB_ENGLISH_DIC 
+# snake casing: cwk_fetch_web_dic 
 # Sublime Text translates camel cased commands into snake cased ones.
 # You can run snake cased command by calling the view's run_command() method as the following:
-# 	view.run_command("cwk_fetch_WEB_ENGLISH_DIC", text_to_insert)
+# 	view.run_command("cwk_fetch_web_dic", text_to_insert)
 
 class CwkFetchWebDic(sublime_plugin.TextCommand, cwkBase):
 
