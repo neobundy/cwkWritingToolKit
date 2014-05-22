@@ -11,6 +11,8 @@ Wankyu Choi <wankyuchoi@gmail.com>
     - auto-completion by fetching web dictionary entries 
         - fetches Korean synonyms recursively
         - fetcher runs as a thread
+        - web dictionaries are displayed using popup or quick panel (quick panel is default)
+        - 'force language mode' disables auto language detect (context menu)
   
 - <kbd> CTRL+SPACE </kbd> (Default Autocompletion shortcut)
       
