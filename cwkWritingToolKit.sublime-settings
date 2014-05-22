@@ -27,4 +27,7 @@
 	// Maximum autocomplete suggestions
 
 	"max_autocomplete_suggestions": 200,
+
+	// Method to display web dictionaries: popup, quick_panel
+	"web_dic_display_method": "quick_panel"
 }

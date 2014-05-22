@@ -42,6 +42,8 @@ CUSTOM_DICTIONARY_COMMENT_CHAR = '#'
 
 MAX_AUTOCOMPLETE_SUGGETIONS = 100
 
+DEFAULT_WEB_DIC_DISPLAY_METHOD = 'popup'
+
 class cwkBase:
 	def __init__(self):
 		self.plugin_settings = sublime.load_settings("cwkWritingToolKit.sublime-settings")
@@ -54,6 +56,8 @@ class cwkBase:
 		self.custom_dictionary_extensions = self.plugin_settings.get("custom_dictionary_extensions", [])
 		self.force_rebuild_corpus_on_every_save = self.plugin_settings.get("force_rebuild_corpus_on_every_save", False)
 		self.max_autocomplete_suggestions = self.plugin_settings.get("max_autocomplete_suggestions", MAX_AUTOCOMPLETE_SUGGETIONS)
+		self.web_dic_display_method = self.plugin_settings.get("web_dic_display_method", DEFAULT_WEB_DIC_DISPLAY_METHOD)
+
 		self._words = []
 
 	def isKorean(self, word):
@@ -365,9 +369,10 @@ class cwkKoreanWebDicParser(cwkWebDicParser):
 
 class CwkWebDicFetcherThread(cwkBase, threading.Thread):
 
-	def __init__(self, search_keyword, view):  
+	def __init__(self, search_keyword, window, view):  
 		cwkBase.__init__(self)
 		self.search_keyword = search_keyword
+		self.window = window
 		self.view = view
 		self.timeout_seconds = TIMEOUT_SECONDS
 		self._query_depth = 0
@@ -394,7 +399,16 @@ class CwkWebDicFetcherThread(cwkBase, threading.Thread):
 
 			self.log("{num} synonym(s) found".format(num=len(self._words)))
 			if self._words:
-				self.view.show_popup_menu(self._words, self.on_done)
+				self.showWebDic()
+
+	def showWebDic(self):
+
+		if self.web_dic_display_method == 'popup':
+			self.view.show_popup_menu(self._words, self.replaceSelectedWord)
+		elif self.web_dic_display_method == 'quick_panel':
+			self.window.show_quick_panel(self._words, self.replaceSelectedWord)
+		else:
+			self.log("Unknown web dic display method: {}".format(self.web_dic_display_method))
 
 	def fetchKoreanSynonyms(self, word):
 		"""resursively fetches synonyms until _query_depth > MAX_QUERY_DEPTH
@@ -426,11 +440,10 @@ class CwkWebDicFetcherThread(cwkBase, threading.Thread):
 		if self.isAlive():
 			self._Thread__stop()
 
-	def on_done(self, index):
-		"""show_popup_menu callback method 
+	def replaceSelectedWord(self, index):
+		"""showWebDic callback method 
 		"""
-
-		# if the use canceled out of the popout menu, -1 is returned. Otherwise the index is returned.
+		# if the use canceled out of the selection menu, -1 is returned. Otherwise the index is returned.
 
 		if index == -1: return
 
@@ -468,7 +481,7 @@ class CwkFetchWebDic(sublime_plugin.TextCommand, cwkBase):
 		self._words = []
 		if self._fetcher_thread != None:
 			self._fetcher_thread.stop()
-		self._fetcher_thread = CwkWebDicFetcherThread(self.currentWord, view)
+		self._fetcher_thread = CwkWebDicFetcherThread(self.currentWord, window, view)
 		self._fetcher_thread.start()
 		self.log("web dic thread started")
 
