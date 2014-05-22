@@ -72,7 +72,7 @@ class cwkBase:
 		else:
 			return False
 
-	def is_corpus_file(self, filename):
+	def isCorpusFile(self, filename):
 		"""check if the given file should be parsed
 		"""
 		try:
@@ -83,7 +83,7 @@ class cwkBase:
 			return False
 
 
-	def is_dictionary_file(self, filename):
+	def isDictionaryFile(self, filename):
 		"""check if the given file is a dictionary
 		"""
 		try:
@@ -169,9 +169,9 @@ class cwkCorpus(cwkBase):
 		for auto_word in self._words:
 			if word_count > self.max_autocomplete_suggestions: break
 			if word in auto_word.name:
-				if self.is_corpus_file(auto_word.filename) and auto_word.name in seen: continue
+				if self.isCorpusFile(auto_word.filename) and auto_word.name in seen: continue
 				seen.append(auto_word.name)
-				if self.is_corpus_file(auto_word.filename):
+				if self.isCorpusFile(auto_word.filename):
 					label = auto_word.name + '\t' + auto_word.filename
 					str_to_insert = auto_word.name
 				else:
@@ -212,7 +212,7 @@ class cwkWordsCollectorThread(cwkBase, threading.Thread):
 			if file.startswith('.'): continue 
 			fullpath = os.path.join(folder, file)
 
-			if os.path.isfile(fullpath) and (self.is_corpus_file(fullpath) or self.is_dictionary_file(fullpath)):
+			if os.path.isfile(fullpath) and (self.isCorpusFile(fullpath) or self.isDictionaryFile(fullpath)):
 				autocomplete_word_files.append(fullpath)
 			elif os.path.isdir(fullpath):
 				autocomplete_word_files += self.getWordFiles(fullpath, *args)
@@ -220,7 +220,7 @@ class cwkWordsCollectorThread(cwkBase, threading.Thread):
 
 	def collectWords(self, filename):
 		file_lines = codecs.open(filename, "r", "utf-8")
-		if self.is_corpus_file(filename):
+		if self.isCorpusFile(filename):
 			# english, korean, japanese regex patterns
 			pattern = re.compile(r'([\w가-힣一-龠あ-んア-ン]+)')
 			for line in file_lines:
@@ -228,7 +228,7 @@ class cwkWordsCollectorThread(cwkBase, threading.Thread):
 					if len(m) > MIN_WORD_LEN and len(m) < MAX_WORD_LEN:
 						self.collector.addWord(m, os.path.basename(filename))
 
-		elif self.is_dictionary_file(filename):
+		elif self.isDictionaryFile(filename):
 			for line in file_lines:
 				line = line.strip()
 				if line.startswith(CUSTOM_DICTIONARY_COMMENT_CHAR): continue
@@ -598,7 +598,7 @@ class CwkAutoComplete(cwkCorpus, cwkBase, sublime_plugin.EventListener):
 	def on_query_completions(self, view, prefix, locations):
 		current_file = view.file_name()
 		completions = []
-		if self.is_corpus_file(current_file):
+		if self.isCorpusFile(current_file):
 			return self.get_autocomplete_list(prefix)
 			completions.sort()
 		return (completions, sublime.INHIBIT_EXPLICIT_COMPLETIONS)
