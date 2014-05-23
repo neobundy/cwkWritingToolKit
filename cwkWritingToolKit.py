@@ -451,7 +451,7 @@ class CwkWebDicFetcherThread(cwkBase, threading.Thread):
 		response = urllib.request.urlopen(request)
 		webpage = response.read().decode('utf-8')
 
-		parser = cwkKoreanWebDicParser()
+		parser = cwkKoreanWebDicParser(self.view)
 
 		parser.feed(webpage)
 		for s in parser.getWordsFromWebDictionary():
