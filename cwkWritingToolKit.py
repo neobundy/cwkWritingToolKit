@@ -194,12 +194,16 @@ class cwkWordsCollectorThread(cwkBase, threading.Thread):
 		cwkBase.__init__(self)
 
 	def run(self):
+		files = []
 		for folder in self.open_folders:
 			files = self.getWordFiles(folder)
 			for filename in files:
 				self.collectWords(filename)
-		self.log("{num_words} word(s) found in {num_files} corpus file(s)".format(num_words=self.collector.numWords(), num_files=len(files)))
-		
+		if files:
+			self.log("{num_words} word(s) found in {num_files} corpus file(s)".format(num_words=self.collector.numWords(), num_files=len(files)))
+		else:
+			self.log("No corpus file found.")
+
 	def stop(self):
 		if self.isAlive():
 			try:
