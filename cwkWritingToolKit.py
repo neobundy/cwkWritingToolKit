@@ -396,7 +396,8 @@ class CwkWebDicFetcherThread(cwkBase, threading.Thread):
 				self._words = []
 				self.fetchKoreanSynonyms(self.search_keyword)
 			elif self.force_mode == 'English':
-				options = WEB_ENGLISH_DIC_OPTIONS.format(query=self.search_keyword)
+				encoded_query = urllib.parse.quote(self.search_keyword)
+				options = WEB_ENGLISH_DIC_OPTIONS.format(query=encoded_query)
 				request = urllib.request.Request(WEB_ENGLISH_DIC_URL % options)
 				response = urllib.request.urlopen(request)
 				webpage = response.read().decode('utf-8')
@@ -409,8 +410,8 @@ class CwkWebDicFetcherThread(cwkBase, threading.Thread):
 				self.log("Feature not implemented yet.")
 			else:
 				if self.isEnglish(self.search_keyword):
-			
-					options = WEB_ENGLISH_DIC_OPTIONS.format(query=self.search_keyword)
+					encoded_query = urllib.parse.quote(self.search_keyword)
+					options = WEB_ENGLISH_DIC_OPTIONS.format(query=encoded_query)
 					request = urllib.request.Request(WEB_ENGLISH_DIC_URL % options)
 					response = urllib.request.urlopen(request)
 					webpage = response.read().decode('utf-8')
