@@ -42,7 +42,7 @@ CUSTOM_DICTIONARY_COMMENT_CHAR = '#'
 
 MAX_AUTOCOMPLETE_SUGGETIONS = 100
 
-DEFAULT_WEB_DIC_DISPLAY_METHOD = 'popup'
+DEFAULT_WEB_DIC_DISPLAY_METHOD = 'quick_panel'
 
 class cwkBase:
 	def __init__(self):
@@ -53,8 +53,8 @@ class cwkBase:
 		self.korean_voice = self.plugin_settings.get("korean_voice", False)
 		self.japanese_voice = self.plugin_settings.get("japanese_voice", False)
 		self.corpus_extensions = self.plugin_settings.get("corpus_extensions", [])
-		self.custom_dictionary_extensions = self.plugin_settings.get("custom_dictionary_extensions", [])
-		self.force_rebuild_corpus_on_every_save = self.plugin_settings.get("force_rebuild_corpus_on_every_save", False)
+		self.custom_dictionary_extensions = self.plugin_settings.get("custom_dictionary_extensions", ['.cwkcsv',])
+		self.force_rebuild_corpus_on_every_save = self.plugin_settings.get("force_rebuild_corpus_on_every_save", True)
 		self.max_autocomplete_suggestions = self.plugin_settings.get("max_autocomplete_suggestions", MAX_AUTOCOMPLETE_SUGGETIONS)
 		self.web_dic_display_method = self.plugin_settings.get("web_dic_display_method", DEFAULT_WEB_DIC_DISPLAY_METHOD)
 
