@@ -1,3 +1,5 @@
 dictionary.cwktxt
 scratchpad.cwktxt
 cwkDic*.cwkcsv
+*.sublime-project
+*.sublime-workspace

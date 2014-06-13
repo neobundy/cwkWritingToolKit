@@ -82,7 +82,7 @@ class cwkBase:
 		try:
 			fname, fextension = os.path.splitext(filename)
 			return fextension in self.corpus_extensions
-		except TypeError as e:
+		except AttributeError as e:
 			self.log("Error reading {filename}: {error}".format(filename=filename, error=e))
 			return False
 
@@ -93,7 +93,7 @@ class cwkBase:
 		try:
 			fname, fextension = os.path.splitext(filename)
 			return fextension in self.custom_dictionary_extensions
-		except TypeError as e:
+		except AttributeError as e:
 			self.log("Error reading {filename}: {error}".format(filename=filename, error=e))
 			return False
 
