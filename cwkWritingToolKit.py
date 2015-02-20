@@ -31,7 +31,6 @@ KOREAN_TARGET_BLOCK_CLASS_ID = 'head_word'
 KOREAN_TARGET_BLOCK_END_TAG = 'div'
 KOREAN_TARGET_BLOCK_END_CLASS_ID = 'btn_showmore'
 KOREAN_TARGET_KEYWORD_TAG = 'strong'
-
 JAPANESE_TARGET_BLOCK_TAG = 'span'
 JAPANESE_TARGET_KEYWORD = '[유의어]' 
 JAPANESE_TARGET_SYNONYM_TAG = 'a'
@@ -196,8 +195,15 @@ class cwkWordsCollectorThread(cwkBase, threading.Thread):
 	def run(self):
 		files = []
 		for folder in self.open_folders:
+			# skip archives
+			if "/_" in folder : 
+				self.log("Skipping the archived folder: {name}".format(name=folder))
+				continue
 			files = self.getWordFiles(folder)
 			for filename in files:
+				if "/_" in filename:
+					self.log("Skipping the archived file or folder: {name}".format(name=filename))
+					continue
 				self.collectWords(filename)
 		if files:
 			self.log("{num_words} word(s) found in {num_files} corpus file(s)".format(num_words=self.collector.numWords(), num_files=len(files)))
@@ -442,7 +448,7 @@ class CwkWebDicFetcherThread(cwkBase, threading.Thread):
 			self.log("Unknown web dic display method: {}".format(self.web_dic_display_method))
 
 	def fetchKoreanSynonyms(self, word):
-		"""resursively fetches synonyms until _query_depth > MAX_QUERY_DEPTH
+		"""resursively fetches synonyms until _query_depth > MAX_QUERY_DEPTH 
 		"""
 
 		self._query_depth +=1
