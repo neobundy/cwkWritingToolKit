@@ -200,13 +200,15 @@ class cwkWordsCollectorThread(cwkBase, threading.Thread):
 				self.log("Skipping the archived folder: {name}".format(name=folder))
 				continue
 			files = self.getWordFiles(folder)
+			num_files = len(files)
 			for filename in files:
 				if "/_" in filename:
 					self.log("Skipping the archived file or folder: {name}".format(name=filename))
+					num_files = num_files - 1
 					continue
 				self.collectWords(filename)
 		if files:
-			self.log("{num_words} word(s) found in {num_files} corpus file(s)".format(num_words=self.collector.numWords(), num_files=len(files)))
+			self.log("{num_words} word(s) found in {num_files} corpus file(s)".format(num_words=self.collector.numWords(), num_files=num_files))
 		else:
 			self.log("No corpus file found.")
 
