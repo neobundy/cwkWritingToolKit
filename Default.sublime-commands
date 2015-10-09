@@ -1,7 +1,7 @@
 [
-	{
+    {
 
-		"caption": "CWK Look Up Web Dictionary",
-		"command": "cwk_fetch_web_dic",
-	}
+        "caption": "CWK Look Up Web Dictionary",
+        "command": "cwk_fetch_web_dic",
+    }
 ]

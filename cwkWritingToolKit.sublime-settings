@@ -1,33 +1,33 @@
 {
-	// Toggle Debug Mode
-	"debug": true,
+    // Toggle Debug Mode
+    "debug": true,
 
-	// Use System Voice: Mac OSX only
+    // Use System Voice: Mac OSX only
 
-	"read_aloud_current_word": true,
+    "read_aloud_current_word": true,
 
-	// System Voices
+    // System Voices
 
-	"korean_voice": "Yuna",
-	"english_voice": "Samantha",
-	"japanese_voice": "Kyoko",
+    "korean_voice": "Yuna",
+    "english_voice": "Samantha",
+    "japanese_voice": "Kyoko",
 
-	// Corpus file xtensions 
+    // Corpus file xtensions 
 
-	"corpus_extensions": [".cwktxt", ".md"],
+    "corpus_extensions": [".cwktxt", ".md"],
 
-	// Custom dictionary file extensions: must be a comma seperated values(csv): keyword, element1, element2, element3, etc
+    // Custom dictionary file extensions: must be a comma seperated values(csv): keyword, element1, element2, element3, etc
 
-	"custom_dictionary_extensions": [".cwkcsv",],
+    "custom_dictionary_extensions": [".cwkcsv",],
 
-	// Force rebuilding corpus on every save
+    // Force rebuilding corpus on every save
 
-	"force_rebuild_corpus_on_every_save": true,
+    "force_rebuild_corpus_on_every_save": true,
 
-	// Maximum autocomplete suggestions
+    // Maximum autocomplete suggestions
 
-	"max_autocomplete_suggestions": 200,
+    "max_autocomplete_suggestions": 200,
 
-	// Method to display web dictionaries: popup, quick_panel
-	"web_dic_display_method": "quick_panel"
+    // Method to display web dictionaries: popup, quick_panel
+    "web_dic_display_method": "quick_panel"
 }
