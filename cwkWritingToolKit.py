@@ -9,7 +9,11 @@ import threading
 import subprocess
 from html.parser import HTMLParser
 
-VERSION = "0.2b"
+VERSION = "0.3b"
+
+# Filters
+
+USELESS_ENDINGS = ["까","요", "쇼", "죠", "만", "고", "__"]
 
 # English Dictionary: Naver
 WEB_ENGLISH_DIC_URL = "http://endic.naver.com/search.nhn?%s"
@@ -85,6 +89,12 @@ class cwkBase:
         else:
             return False
 
+    def isEndingOkay(self, word):
+        for ending in USELESS_ENDINGS:
+            if word.endswith(ending):
+                return False
+        return True
+
     def isCorpusFile(self, filename):
         """check if the given file should be parsed
         """
@@ -135,7 +145,8 @@ class cwkBase:
         """
 
         if(self.debug):
-            print ("[cwk log] ==  {msg}".format(msg=message))
+            print("[cwk log] ==  {msg}".format(msg=message))
+
 
 class cwkWord:
     _name = ""
@@ -186,6 +197,9 @@ class cwkCorpus(cwkBase):
             if word in auto_word.name:
                 if self.isCorpusFile(auto_word.filename) and auto_word.name in seen:
                     continue
+                if not self.isEndingOkay(auto_word.name):
+                    continue
+
                 seen.append(auto_word.name)
                 if self.isCorpusFile(auto_word.filename):
                     label = auto_word.name + '\t' + auto_word.filename
