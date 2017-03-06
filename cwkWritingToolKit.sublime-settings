@@ -2,6 +2,11 @@
     // Toggle Debug Mode
     "debug": true,
 
+    // Keyword Only Mode
+
+    "collect_keyword_only": true,
+
+
     // Use System Voice: Mac OSX only
 
     "read_aloud_current_word": true,
@@ -26,7 +31,7 @@
 
     // Maximum autocomplete suggestions
 
-    "max_autocomplete_suggestions": 200,
+    "max_autocomplete_suggestions": 100,
 
     // Method to display web dictionaries: popup, quick_panel
     "web_dic_display_method": "quick_panel"

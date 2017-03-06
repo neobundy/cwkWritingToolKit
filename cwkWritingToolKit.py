@@ -61,6 +61,7 @@ class cwkBase:
         self.plugin_settings = sublime.load_settings("cwkWritingToolKit.sublime-settings")
         self.debug = self.plugin_settings.get("debug", False)
         self.read_aloud = self.plugin_settings.get("read_aloud_current_word", False)
+        self.collect_keyword_only = self.plugin_settings.get("collect_keyword_only", False)        
         self.english_voice = self.plugin_settings.get("english_voice", False)
         self.korean_voice = self.plugin_settings.get("korean_voice", False)
         self.japanese_voice = self.plugin_settings.get("japanese_voice", False)
@@ -195,7 +196,6 @@ class cwkCorpus(cwkBase):
 
     def get_autocomplete_list(self, word):
         autocomplete_list = []
-        keyword_list = []
         word_list = []
         seen = []
         word_count = 0
@@ -216,8 +216,11 @@ class cwkCorpus(cwkBase):
                 else:
                     label = auto_word.name + '\t' + auto_word.filename
                     str_to_insert = auto_word.filename
-                keyword_list.append((label, str_to_insert))
+                autocomplete_list.append((label, str_to_insert))
                 word_count += 1
+
+        if self.collect_keyword_only:
+            return autocomplete_list
 
         # the rest
 
@@ -237,11 +240,8 @@ class cwkCorpus(cwkBase):
                 else:
                     label = auto_word.name + '\t' + auto_word.filename
                     str_to_insert = auto_word.filename
-                word_list.append((label, str_to_insert))
+                autocomplete_list.append((label, str_to_insert))
                 word_count += 1
-
-        # autocomplete_list = keyword_list
-        autocomplete_list = keyword_list + word_list
 
         return autocomplete_list
 
@@ -269,7 +269,7 @@ class cwkWordsCollectorThread(cwkBase, threading.Thread):
                     num_files = num_files - 1
                     continue
                 self.collectKeywords(filename)
-                self.collectWords(filename)
+                if not self.collect_keyword_only: self.collectWords(filename)
         if files:
             self.log("{num_words} word(s) found in {num_files} corpus file(s)".format(num_words=self.collector.numWords(), num_files=num_files))
         else:
