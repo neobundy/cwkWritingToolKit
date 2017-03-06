@@ -9,7 +9,7 @@ import threading
 import subprocess
 from html.parser import HTMLParser
 
-VERSION = "0.3b"
+VERSION = "0.4a"
 
 # Filters
 
@@ -54,6 +54,7 @@ MAX_AUTOCOMPLETE_SUGGETIONS = 100
 
 DEFAULT_WEB_DIC_DISPLAY_METHOD = 'quick_panel'
 
+KEYWORD_REGEX = r'\*\*([^*]+)\*\*'
 
 class cwkBase:
     def __init__(self):
@@ -176,21 +177,50 @@ class cwkWord:
 class cwkCorpus(cwkBase):
     def __init__(self):
         self._words = []
+        self._keywords = []
         cwkBase.__init__(self)
 
     def clearCorpus(self):
         self._words = []
+        self._keywords = []
 
     def numWords(self):
-        return len(self._words)
+        return  len(self._keywords) + len(self._words)
 
     def addWord(self, name, filename):
         self._words.append(cwkWord(name, filename))
 
+    def addKeyword(self, name, filename):
+        self._keywords.append(cwkWord(name, filename))
+
     def get_autocomplete_list(self, word):
         autocomplete_list = []
+        keyword_list = []
+        word_list = []
         seen = []
         word_count = 0
+
+        # keywords first
+
+        for auto_word in self._keywords:
+            if word_count > self.max_autocomplete_suggestions:
+                break
+            if word in auto_word.name:
+                if self.isCorpusFile(auto_word.filename) and auto_word.name in seen:
+                    continue
+
+                seen.append(auto_word.name)
+                if self.isCorpusFile(auto_word.filename):
+                    label = auto_word.name + '\t' + auto_word.filename
+                    str_to_insert = auto_word.name
+                else:
+                    label = auto_word.name + '\t' + auto_word.filename
+                    str_to_insert = auto_word.filename
+                keyword_list.append((label, str_to_insert))
+                word_count += 1
+
+        # the rest
+
         for auto_word in self._words:
             if word_count > self.max_autocomplete_suggestions:
                 break
@@ -207,8 +237,12 @@ class cwkCorpus(cwkBase):
                 else:
                     label = auto_word.name + '\t' + auto_word.filename
                     str_to_insert = auto_word.filename
-                autocomplete_list.append((label, str_to_insert))
+                word_list.append((label, str_to_insert))
                 word_count += 1
+
+        # autocomplete_list = keyword_list
+        autocomplete_list = keyword_list + word_list
+
         return autocomplete_list
 
 
@@ -234,6 +268,7 @@ class cwkWordsCollectorThread(cwkBase, threading.Thread):
                     self.log("Skipping the archived file or folder: {name}".format(name=filename))
                     num_files = num_files - 1
                     continue
+                self.collectKeywords(filename)
                 self.collectWords(filename)
         if files:
             self.log("{num_words} word(s) found in {num_files} corpus file(s)".format(num_words=self.collector.numWords(), num_files=num_files))
@@ -252,7 +287,9 @@ class cwkWordsCollectorThread(cwkBase, threading.Thread):
         """
 
         autocomplete_word_files = []
-        for file in os.listdir(folder):
+        folders = os.listdir(folder)
+        folders.sort(reverse=True)
+        for file in folders:
             if file.startswith('.'):
                 continue
             fullpath = os.path.join(folder, file)
@@ -263,9 +300,22 @@ class cwkWordsCollectorThread(cwkBase, threading.Thread):
                 autocomplete_word_files += self.getWordFiles(fullpath, *args)
         return autocomplete_word_files
 
+    def collectKeywords(self, filename):
+        file_lines = codecs.open(filename, "r", "utf-8")
+
+        if self.isCorpusFile(filename):
+
+            # extract keywords
+            pattern = re.compile(KEYWORD_REGEX)
+            for line in file_lines:
+                for m in re.findall(pattern, line):
+                    self.collector.addKeyword(m, os.path.basename(filename))
+
     def collectWords(self, filename):
         file_lines = codecs.open(filename, "r", "utf-8")
+
         if self.isCorpusFile(filename):
+
             # english, korean, japanese regex patterns
             pattern = re.compile(r'([\w가-힣一-龠あ-んア-ン]+)')
             for line in file_lines:
