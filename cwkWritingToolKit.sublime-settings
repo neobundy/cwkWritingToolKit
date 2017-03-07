@@ -2,10 +2,9 @@
     // Toggle Debug Mode
     "debug": true,
 
-    // Keyword Only Mode
-
-    "collect_keyword_only": true,
-
+    // Keyword File
+    "keyword_file": "cwkKeywords.md",
+    "keyword_file_delimiter": "\t",    
 
     // Use System Voice: Mac OSX only
 

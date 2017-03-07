@@ -61,7 +61,11 @@ class cwkBase:
         self.plugin_settings = sublime.load_settings("cwkWritingToolKit.sublime-settings")
         self.debug = self.plugin_settings.get("debug", False)
         self.read_aloud = self.plugin_settings.get("read_aloud_current_word", False)
-        self.collect_keyword_only = self.plugin_settings.get("collect_keyword_only", False)        
+        self.keyword_file = self.plugin_settings.get("keyword_file", "cwkKeywords.md")
+
+        self.keyword_file_path = os.path.join(sublime.packages_path(), 'cwkWritingToolkit', self.keyword_file)
+
+        self.keyword_file_delimiter = self.plugin_settings.get("keyword_file_delimiter", "\t")                
         self.english_voice = self.plugin_settings.get("english_voice", False)
         self.korean_voice = self.plugin_settings.get("korean_voice", False)
         self.japanese_voice = self.plugin_settings.get("japanese_voice", False)
@@ -72,6 +76,7 @@ class cwkBase:
         self.web_dic_display_method = self.plugin_settings.get("web_dic_display_method", DEFAULT_WEB_DIC_DISPLAY_METHOD)
 
         self._words = []
+        self._keywords = []
 
     def isKorean(self, word):
         if re.match(r'(^[가-힣]+)', word):
@@ -189,10 +194,12 @@ class cwkCorpus(cwkBase):
         return  len(self._keywords) + len(self._words)
 
     def addWord(self, name, filename):
-        self._words.append(cwkWord(name, filename))
+        if name.strip():
+            self._words.append(cwkWord(name, filename))
 
     def addKeyword(self, name, filename):
-        self._keywords.append(cwkWord(name, filename))
+        if name.strip():
+            self._keywords.append(cwkWord(name, filename))
 
     def get_autocomplete_list(self, word):
         autocomplete_list = []
@@ -218,9 +225,6 @@ class cwkCorpus(cwkBase):
                     str_to_insert = auto_word.filename
                 autocomplete_list.append((label, str_to_insert))
                 word_count += 1
-
-        if self.collect_keyword_only:
-            return autocomplete_list
 
         # the rest
 
@@ -269,8 +273,19 @@ class cwkWordsCollectorThread(cwkBase, threading.Thread):
                     num_files = num_files - 1
                     continue
                 self.collectKeywords(filename)
-                if not self.collect_keyword_only: self.collectWords(filename)
+                self.collectWords(filename)
         if files:
+
+            # save keywords
+
+            fh = codecs.open(self.keyword_file_path, "w", "utf-8")
+            self.log("Saving keywords to {}".format(self.keyword_file_path))
+
+            for kw in self.collector._keywords:
+                line_to_write = kw.name + self.keyword_file_delimiter + kw.filename + "\n"
+                fh.write(line_to_write)
+            fh.close()
+
             self.log("{num_words} word(s) found in {num_files} corpus file(s)".format(num_words=self.collector.numWords(), num_files=num_files))
         else:
             self.log("No corpus file found.")
@@ -573,9 +588,9 @@ class CwkWebDicFetcherThread(cwkBase, threading.Thread):
 
         # run Text Command cwk_insert_selected_text to replace the current word with the user's choice
 
-        self.view.run_command("cwk_insert_selected_text", {"args": {'text': selected_string.strip()} })
+        self.view.run_command("cwk_insert_selected_text", {"args": {'text': selected_string.strip()} }, text_type='keyword')
 
-# cwk_fetch_WEB_ENGLISH_DIC text command inserts one of the synonym definitions fetched from the given web dictionary.
+# cwk_fetch_web_dic text command inserts one of the synonym definitions fetched from the given web dictionary.
 # camel casing: CwkFetchWebDic
 # snake casing: cwk_fetch_web_dic
 # Sublime Text translates camel cased commands into snake cased ones.
@@ -636,10 +651,11 @@ class CwkInsertSelectedText(sublime_plugin.TextCommand, cwkBase):
 
         # view.replace() replaces the selected word with the given text. edit is the buffer currently in use.
 
-        self.view.replace(edit, word_region, args['text'])
+        replace_text = args['text']
+        if args['text_type'] == 'keyword':
+            replace_text = replace_text.split(self.keyword_file_delimiter)[0]
 
-        self.readAloud(args['text'])
-
+        self.view.replace(edit, word_region, replace_text)
 
 class CwkWebDic(sublime_plugin.WindowCommand, cwkBase):
     def __init__(self, window):
@@ -662,7 +678,7 @@ class CwkWebDic(sublime_plugin.WindowCommand, cwkBase):
         self._normalizedWords = []
 
     def run(self):
-        """run method is triggered when this cwk_auto_comoplete command is called
+        """run method is triggered when this command is called
         """
 
         window = sublime.active_window()
@@ -705,6 +721,71 @@ class CwkWebDic(sublime_plugin.WindowCommand, cwkBase):
         if self._words:
             self._normalizedWords = [w.strip() for w in self._words if self.currentWord in w]
 
+
+class CwkFetchKeywords(sublime_plugin.WindowCommand, cwkCorpus):
+    def __init__(self, window):
+
+        # super() refers to the immediate ancestor: sublime_plugin.WindowCommand in this case.
+
+        super().__init__(window)
+        cwkBase.__init__(self)
+
+        # get active window and view
+
+        window = sublime.active_window()
+        view = window.active_view()
+
+        # save the word at the cursor position
+
+        self.currentWord = view.substr(view.word(view.sel()[0].begin()))
+
+        # self._words stores all found words whereas self._normalizedWords stores unique values.
+        self._normalizedWords = []
+
+    def run(self):
+        """run method is triggered when this command is called
+        """
+
+        window = sublime.active_window()
+        view = window.active_view()
+
+        # self.log() spits out messages only when debug mode is on, that is, set to true.
+        self.currentWord = view.substr(view.word(view.sel()[0].begin()))
+        
+        self.log("Current word: {}".format(self.currentWord))
+
+        self.normalizeWords()
+
+        # view.shop_popup_menu() displays a popout menu presenting the words that contain the self.currentWord.
+        # self.on_done is a callback method to be called when a selection is made.
+
+        self.window.show_quick_panel(self._normalizedWords, self.on_done)
+
+    def on_done(self, index):
+        """show_popup_menu callback method
+        """
+        # if the use canceled out of the popout menu, -1 is returned. Otherwise the index is returned.
+
+        if index == -1:
+            return
+
+        selected_string = self._normalizedWords[index]
+        window = sublime.active_window()
+        view = window.active_view()
+
+        # run Text Command cwk_insert_selected_text to replace the current word with the user's choices
+
+        view.run_command("cwk_insert_selected_text", {"args": {'text': selected_string.strip(), 'text_type': "keyword"}})
+
+    def normalizeWords(self):
+        """selects only those words that match the current word
+        """
+
+        # Python idiom: list comprehension
+        # discards the words not matching the current word and strip whitespaces at both ends
+        if os.path.isfile(self.keyword_file_path):
+            fh = codecs.open(self.keyword_file_path, "r", "utf-8")
+            self._normalizedWords = [w.strip() for w in fh.readlines() if self.currentWord in w]
 
 class CwkAutoComplete(cwkCorpus, cwkBase, sublime_plugin.EventListener):
 
