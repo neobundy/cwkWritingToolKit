@@ -61,7 +61,7 @@ class cwkBase:
         self.plugin_settings = sublime.load_settings("cwkWritingToolKit.sublime-settings")
         self.debug = self.plugin_settings.get("debug", False)
         self.read_aloud = self.plugin_settings.get("read_aloud_current_word", False)
-        self.keyword_file = self.plugin_settings.get("keyword_file", "cwkKeywords.md")
+        self.keyword_file = self.plugin_settings.get("keyword_file", "cwkKeywords.tmp")
 
         self.keyword_file_path = os.path.join(sublime.packages_path(), 'cwkWritingToolkit', self.keyword_file)
 
@@ -281,7 +281,12 @@ class cwkWordsCollectorThread(cwkBase, threading.Thread):
             fh = codecs.open(self.keyword_file_path, "w", "utf-8")
             self.log("Saving keywords to {}".format(self.keyword_file_path))
 
+            seen = []
             for kw in self.collector._keywords:
+                if kw.name in seen: 
+                    continue
+                seen.append(kw.name)
+
                 line_to_write = kw.name + self.keyword_file_delimiter + kw.filename + "\n"
                 fh.write(line_to_write)
             fh.close()
@@ -324,6 +329,7 @@ class cwkWordsCollectorThread(cwkBase, threading.Thread):
             pattern = re.compile(KEYWORD_REGEX)
             for line in file_lines:
                 for m in re.findall(pattern, line):
+
                     self.collector.addKeyword(m, os.path.basename(filename))
 
     def collectWords(self, filename):

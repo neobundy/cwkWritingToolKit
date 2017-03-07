@@ -1,5 +1,5 @@
 [
     { "keys": ["super+ctrl+option+f"], "command": "cwk_fetch_web_dic"},
-    { "keys": ["super+ctrl+option+;"], "command": "cwk_fetch_keywords"},
+    { "keys": ["super+ctrl+option+space"], "command": "cwk_fetch_keywords"},
 ]
 	

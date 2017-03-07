@@ -3,7 +3,7 @@
     "debug": true,
 
     // Keyword File
-    "keyword_file": "cwkKeywords.md",
+    "keyword_file": "cwkKeywords.tmp",
     "keyword_file_delimiter": "\t",    
 
     // Use System Voice: Mac OSX only
