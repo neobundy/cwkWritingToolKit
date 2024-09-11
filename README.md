@@ -1,7 +1,3 @@
-# Developer
-        
-Wankyu Choi <wankyuchoi@gmail.com>
-
 # Features
 
 - <kbd> CMD+OPTION+CTRL+SPACE </kbd> (OSX)
