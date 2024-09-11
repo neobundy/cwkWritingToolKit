@@ -38,19 +38,10 @@ Creative Works of Knowledge - Everything About English & Digital
 
 Wankyu Choi
 
-C.W.K. Entertainment. - http://www.creativeworksofknowledge.com/
-
-GitHub: https://github.com/neobundy
-
-youtube: http://www.youtube.com/neowankyu
-
-facebook: https://www.facebook.com/neowankyuchoi
-
-Twitter - https://twitter.com/neobundy
-
-Blog - http://wankyuchoi.blogspot.com/ 
-
-Email - wankyuchoi@gmail.com 
+🔗 X: https://x.com/WankyuChoi
+🔗 The Official Domain for My Repo: https://cwkai.net
+🔗 The Official Domain for My AI Artworks and Essays: https://creativeworksofknowledge.net
+🔗 My Artstation Website: https://neobundy.artstation.com/
 
 ---
 
